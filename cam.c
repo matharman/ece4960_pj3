@@ -5,6 +5,8 @@
 
 #include <stdio.h>
 
+#include "CLEyeMulticam.h"
+
 #define FRAME_RATE 60
 #define FRAME_SIZE CLEYE_VGA
 #define FRAME_FORMAT CLEYE_COLOR_RAW
