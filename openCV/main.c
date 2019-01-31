@@ -4,7 +4,6 @@
 //#include <highgui.h>
 
 #include "include/cam.h"
-#include "include/track.h"
 
 typedef struct _vid_cap_data {
     CLEyeCameraInstance cam;
@@ -18,11 +17,9 @@ typedef struct _img_proc_data {
 
 /* Video capture thread */
 static DWORD WINAPI VideoCapThread(LPVOID user_data) {
-    VideoCapData *params = (VideoCapData *)user_data[0];
-    VideoCapData *params = (VideoCapData *)user_data[0];
+    VideoCapData *params = (VideoCapData *)user_data;
 
     while(1) {
-        /* Capture Frame */
         CLEyeCameraGetFrame(params->cam,params->frame);
     }
 }
