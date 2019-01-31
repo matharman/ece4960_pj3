@@ -1,7 +1,10 @@
+#include "stdafx.h"
+#include <cv.h>
+#include <cxcore.h>
+#include <highgui.h>
+
 #include <stdio.h>
 #include <stdlib.h>
-
-//#include <highgui.h>
 
 #include "include/cam.h"
 
@@ -35,7 +38,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
         .frame = NULL
     };
 
-    cap_params.cam = cam_init()
+	cap_params.cam = cam_init();
     if(!cap_params.cam) {
         err = EXIT_FAILURE;
         goto exit;
