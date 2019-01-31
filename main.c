@@ -1,29 +1,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <cv.h>
-#include <cxcore.h>
 //#include <highgui.h>
 
 #include "include/cam.h"
+#include "include/track.h"
 
 typedef struct _vid_cap_data {
     CLEyeCameraInstance cam;
     PBYTE frame;
 } VideoCapData;
 
+typedef struct _img_proc_data {
+    IplImage *img;
+    int avg_fps;
+} ImgProcData;
+
 /* Video capture thread */
 static DWORD WINAPI VideoCapThread(LPVOID user_data) {
-    VideoCapData *params = (VideoCapData *)user_data;
+    VideoCapData *params = (VideoCapData *)user_data[0];
+    VideoCapData *params = (VideoCapData *)user_data[0];
 
     while(1) {
         /* Capture Frame */
         CLEyeCameraGetFrame(params->cam,params->frame);
-
-        /* Threshold for Ping Pong via HSV */
-        printf("Threshold stub\n");
-
-        /* */
     }
 }
 
@@ -38,7 +38,8 @@ int _tmain(int argc, _TCHAR* argv[]) {
         .frame = NULL
     };
 
-    if(!(cap_params.cam = cam_init())) {
+    cap_params.cam = cam_init()
+    if(!cap_params.cam) {
         err = EXIT_FAILURE;
         goto exit;
     }
