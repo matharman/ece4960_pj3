@@ -4,6 +4,9 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+
+#include "include/cam.h"
 
 #define FRAME_RATE 60
 #define FRAME_SIZE CLEYE_VGA
@@ -33,9 +36,38 @@ exit:
     return new;
 }
 
-void cam_destroy(CvCapture * cam) {
+void cam_destroy(CvCapture ** cam) {
     if(cam) {
-        cvReleaseCapture(cam);
+        cvReleaseCapture(&cam);
         cam = NULL;
     }
+}
+
+int cam_capture_frame(CvCapture *cam, CvMat *dest) {
+    int err = EXIT_SUCCESS;
+
+    if(!cam || !dest) {
+        fprintf(stderr, "Invalid arguments!\n");
+        err = EXIT_FAILURE;
+        goto exit;
+    }
+
+    IplImage *framebuf = cvQueryFrame(cam);
+    if(!framebuf) {
+        fprintf(stderr, "Failed to get frame!\n");
+        err = EXIT_FAILURE;
+        goto exit;
+    }
+
+    if(dest->rows != framebuf->height || dest->cols != framebuf->width) {
+        fprintf(stderr, "Frame-Matrix size mismatch!\n");
+        err = EXIT_FAILURE;
+        goto exit;
+    }
+
+    cvCopy(framebuf->data, dest->data->ptr);
+
+exit:
+
+    return err;
 }
