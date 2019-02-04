@@ -19,51 +19,25 @@
     #define CAM_GAIN 0
 #endif
 
-struct _cam_params {
-    GUID cam_id;
-    int frame_w;
-    int frame_h;
-};
 
-static struct _cam_params EyeParams;
+CvCapture *cam_init(void) {
 
-CLEyeCameraInstance cam_init(void) {
+    CvCapture *new = NULL;
 
-    CLEyeCameraInstance new = NULL;
-
-    if(!ClEyeGetCameraCount();) {
-        fprintf(stderr, "No Eye Camera detected!\n");
+    new = cvCaptureFromCAM(0);
+    if(!new) {
+        fprintf(stderr, "Failed to open video capture\n");
         goto exit;
     }
-
-    EyeParams.cam_id = CLEyeGetCameraUUID(0);
-    if(!(new = CLEyeCreateCamera(EyeParams.cam_id))) {
-        fprintf(stderr, "Failed to create Eye Camera!\n");
-        goto exit;
-    }
-
-    CLEyeSetCameraParameter(EyeCamera, CLEYE_EXPOSURE, CAM_EXPOSURE);
-    CLEyeSetCameraParameter(EyeCamera, CLEYE_GAIN, CAM_GAIN);
-    CLEyeCameraGetFrameDimensions(new, EyeParams.frame_w, EyeParams.frame_h);
-    CLEyeCameraStart(new);
-
+    
 exit:
     
     return new;
 }
 
-void cam_destroy(CLEyeCameraInstance cam) {
+void cam_destroy(CvCapture * cam) {
     if(cam) {
-        CLEyeCameraStop(cam);
-        CLEyeDestroyCamera(cam);
+        cvReleaseCapture(cam);
         cam = NULL;
     }
-}
-
-int cam_frame_width(void) {
-    return EyeParams.frame_w;
-}
-
-int cam_frame_height(void) {
-    return EyeParams.frame_h;
 }
