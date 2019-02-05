@@ -20,9 +20,7 @@
     #define CAM_GAIN 0
 #endif
 
-
 CvCapture *cam_init(void) {
-
     CvCapture *new = NULL;
 
     new = cvCaptureFromCAM(0);
