@@ -1,0 +1,5 @@
+--Video cap on Pi
+--Circle recognition
+--HSV redundancy
+--Homography system
+--Motion tracking (centroid of ball)
