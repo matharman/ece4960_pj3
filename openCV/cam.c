@@ -36,7 +36,7 @@ exit:
 
 void cam_destroy(CvCapture ** cam) {
     if(cam) {
-        cvReleaseCapture(&cam);
+        cvReleaseCapture(cam);
         cam = NULL;
     }
 }
@@ -63,7 +63,7 @@ int cam_capture_frame(CvCapture *cam, CvMat *dest) {
         goto exit;
     }
 
-    cvCopy(framebuf->data, dest->data->ptr);
+    cvCopy(framebuf->imageData, dest->data.ptr, NULL);
 
 exit:
 

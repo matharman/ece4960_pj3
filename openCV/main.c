@@ -1,10 +1,6 @@
-#include <cv.h>
-#include <cxcore.h>
-#include <highgui.h>
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthreads.h>
+#include <pthread.h>
 
 #include "include/cam.h"
 
@@ -48,7 +44,7 @@ int main(int argc, char* argv[]) {
         .frame = NULL
     };
 
-	cap_params.cam = cam_init();
+    cap_params.cam = cam_init();
     if(!cap_params.cam) {
         err = EXIT_FAILURE;
         goto exit;
