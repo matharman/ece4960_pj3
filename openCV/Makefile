@@ -1,10 +1,18 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -Wpedantic -g
 
-OPENCV_LIBS=
-LIB=-lpthread $(OPENCV_LIBS)
+LIB=`pkg-config --cflags --libs opencv`
 
 all : CAM TRACK HOMOGRAPHY DETECT
 
 CAM : cam.c main.c
-	$(CC) $(CFLAGS) -o camtest $< -I. $(LIB)
+	$(CC) $(CFLAGS) -o cam $^ -I. $(LIB)
+
+TRACK:
+
+HOMOGRAPHY:
+
+DETECT:
+
+clean:
+	rm camtest

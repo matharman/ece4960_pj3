@@ -63,9 +63,17 @@ int cam_capture_frame(CvCapture *cam, CvMat *dest) {
         goto exit;
     }
 
-    cvCopy(framebuf->imageData, dest->data.ptr, NULL);
+    dest = cvGetMat(framebuf, dest, NULL, 0);
 
 exit:
 
     return err;
+}
+
+size_t cam_frame_r(CvCapture *cam) {
+    return (size_t)cvGetCaptureProperty(cam, CV_CAP_PROP_FRAME_HEIGHT);
+}
+
+size_t cam_frame_c(CvCapture *cam) {
+    return (size_t)cvGetCaptureProperty(cam, CV_CAP_PROP_FRAME_WIDTH);
 }

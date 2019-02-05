@@ -1,12 +1,14 @@
+//#include <pthread.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
+#include <unistd.h>
 
 #include "include/cam.h"
 
 typedef struct _vid_cap_data {
     CvCapture *cam;
-    CvMat frame;
+    CvMat *frame;
 } video_cap_data_t;
 
 /* Video capture thread */
@@ -15,18 +17,22 @@ void *video_cap_thread(void *userdata) {
 
     size_t frame_rows = cam_frame_r(params->cam);
     size_t frame_cols = cam_frame_c(params->cam);
+    printf("Rows: %u\nCols: %u\n", frame_rows, frame_cols);
 
-    CvMat *frame = cvCreateMat(frame_rows, frame_cols, CV_8UC1);
+    params->frame = cvCreateMatHeader(frame_rows, frame_cols, CV_8UC1);
 
-    namedWindow("Debug Stream", WINDOW_AUTOSIZE);
+    cvNamedWindow("Debug Stream", CV_WINDOW_AUTOSIZE);
 
     while(1) {
-        if(cam_capture_frame(params->cam, frame) != EXIT_SUCCESS) {
+        if(cam_capture_frame(params->cam, params->frame) != EXIT_SUCCESS) {
             fprintf(stderr, "Frame capture failed!\n");
             return NULL;
         }
 
-        imshow("Debug Stream", frame);
+        cvShowImage("Debug Stream", params->frame);
+        if(cvWaitKey(1) == 27) {
+            return NULL;
+        }
     }
 }
 
@@ -38,7 +44,7 @@ int main(int argc, char* argv[]) {
     (void)argv;
 
     /* Video capture parameters */
-    pthread_t cap_thread;
+    //pthread_t cap_thread;
     video_cap_data_t cap_params = {
         .cam = NULL,
         .frame = NULL
@@ -50,19 +56,23 @@ int main(int argc, char* argv[]) {
         goto exit;
     }
 
-    cap_thread = pthread_create(&cap_thread, NULL, &video_cap_thread, &cap_params);
+#if 0
+    cap_thread = pthread_create(&cap_thread, NULL, video_cap_thread, &cap_params);
     if(!cap_thread) {
         fprintf(stderr, "Failed to create Capture Thread!\n");
+        fprintf(stderr, "Errno = %s\n", strerror(errno));
         err = EXIT_FAILURE;
         goto exit;
     }
 
-    while(getchar() != 27);
-    pthread_kill(&cap_thread, 0);
+    pthread_join(cap_thread, NULL);
+#endif
+
+    video_cap_thread(&cap_params);
 
 exit:
 
-    cam_destroy(cap_params.cam);
+    cam_destroy(&cap_params.cam);
 
     return err;
 }
