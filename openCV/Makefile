@@ -1,5 +1,10 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -Wpedantic -g
 
-cam: cam.c
-	$(CC) $(CFLAGS) -o cam $(INC)
+OPENCV_LIBS=
+LIB=-lpthread $(OPENCV_LIBS)
+
+all : CAM TRACK HOMOGRAPHY DETECT
+
+CAM : cam.c main.c
+	$(CC) $(CFLAGS) -o camtest $< -I. $(LIB)

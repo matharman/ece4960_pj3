@@ -61,7 +61,8 @@ int main(int argc, char* argv[]) {
         goto exit;
     }
 
-    pthread_join(&cap_thread, NULL);
+    while(getchar() != 27);
+    pthread_kill(&cap_thread, 0);
 
 exit:
 

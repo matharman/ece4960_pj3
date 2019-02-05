@@ -1,5 +1,5 @@
 --Video cap on Pi (cam.c, cam.h)
 --Circle recognition (detect.c, detect.h)
 --HSV recognition redundancy (detect.c, detect.h)
---Homography system (homograph.c, homography.h)
+--Homography system (homography.c, homography.h)
 --Motion tracking (track.c, track.h)
