@@ -8,8 +8,6 @@
 
 #include "include/cam.h"
 
-#include "CLEyeMulticam.h"
-
 #define FRAME_RATE 60
 #define FRAME_SIZE CLEYE_VGA
 #define FRAME_FORMAT CLEYE_COLOR_RAW
@@ -22,9 +20,7 @@
     #define CAM_GAIN 0
 #endif
 
-
 CvCapture *cam_init(void) {
-
     CvCapture *new = NULL;
 
     new = cvCaptureFromCAM(0);
