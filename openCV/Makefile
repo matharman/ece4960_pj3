@@ -15,4 +15,4 @@ HOMOGRAPHY:
 DETECT:
 
 clean:
-	rm camtest
+	rm cam
