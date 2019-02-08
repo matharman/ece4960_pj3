@@ -1,2 +1,9 @@
-.tags
+# Ignore all, then unignore everything with an extension (blocks binaries)
+*
+!*.*
+
+# Also unignore directories
+!*/
+
+# Filetypes to ignore
 *.swp
