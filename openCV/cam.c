@@ -56,10 +56,35 @@ exit:
 }
 
 void cam_destroy(CvCapture ** cam) {
-    if(cam) {
+    if(cam && *cam) {
         cvReleaseCapture(cam);
         *cam = NULL;
     }
+}
+
+IplImage *cam_init_frame(CvCapture *cam) {
+    IplImage *new = NULL;
+
+    if(!cam) {
+        fprintf(stderr, "Invalid arguments!\n");
+        goto exit;
+    }
+
+    IplImage *framebuf = cvQueryFrame(cam);
+    if(!framebuf) {
+        fprintf(stderr, "Failed to query frame data!\n");
+        goto exit;
+    }
+
+    new = cvCloneImage(framebuf);
+    if(!new) {
+        fprintf(stderr, "Failed to clone queried frame!\n");
+        goto exit;
+    }
+
+exit:
+
+    return new;
 }
 
 int cam_capture_frame(CvCapture *cam, CvMat *dest) {
