@@ -87,6 +87,10 @@ exit:
     return new;
 }
 
+void cam_destroy_frame(IplImage **frame) {
+    if(!frame ||
+}
+
 int cam_capture_frame(CvCapture *cam, CvMat *dest) {
     int err = EXIT_SUCCESS;
 
