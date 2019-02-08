@@ -72,6 +72,7 @@ int main(int argc, char* argv[]) {
 exit:
 
     cam_destroy(&cap_params.cam);
+    cam_destroy_frame(&cap_params.frame);
     cvDestroyAllWindows();
 
     return err;
