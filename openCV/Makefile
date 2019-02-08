@@ -1,18 +1,28 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -Wpedantic -g
 
+SRC=$(wildcard *.c)
 LIB=`pkg-config --cflags --libs opencv`
+BIN=pj3_vis
 
-all : CAM TRACK HOMOGRAPHY DETECT
+#$(BIN) : $(SRC)
+#	$(CC) $(CFLAGS) -o $(BIN) $^ -I. $(LIB)
+
+all: CAM HMOG
 
 CAM : cam.c main.c
 	$(CC) $(CFLAGS) -o cam $^ -I. $(LIB)
 
-TRACK:
+HMOG : homography.c main.c
+	$(CC) $(CFLAGS) -o hmog $^ -I. $(LIB)
 
-HOMOGRAPHY:
+TRACK:
 
 DETECT:
 
 clean:
+	echo "Cleaning binaries..."
+	rm pj3_vis
 	rm cam
+	rm hmog
+	echo "Done!"
