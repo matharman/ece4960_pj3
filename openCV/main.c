@@ -6,19 +6,14 @@
 
 struct video_cap_ptrs {
     CvCapture *cam;
-    CvMat *frame;
+    IplImage *frame;
 };
 
 /* Video capture thread */
 void *video_cap_thread(void *userdata) {
     struct video_cap_ptrs *params = (struct video_cap_ptrs *)userdata;
     CvCapture * cam = params->cam;
-    CvMat *frame = params->frame;
-
-    size_t frame_rows = cam_frame_r(cam);
-    size_t frame_cols = cam_frame_c(cam);
-
-    frame = cvCreateMatHeader(frame_rows, frame_cols, CV_8UC1);
+    IplImage *frame = params->frame;
 
     printf("Press any key to exit!\n");
     while(1) {
@@ -56,6 +51,13 @@ int main(int argc, char* argv[]) {
         goto exit;
     }
 
+    cap_params.frame = cam_init_frame(cap_params.cam);
+    if(!cap_params.frame) {
+        fprintf(stderr, "Failed to initialize frame buffer!\n");
+        err = EXIT_FAILURE;
+        goto exit;
+    }
+
     cvNamedWindow("Debug Stream", CV_WINDOW_AUTOSIZE);
 
     pthread_t cap_thread;
@@ -70,7 +72,6 @@ int main(int argc, char* argv[]) {
 exit:
 
     cam_destroy(&cap_params.cam);
-    cvReleaseMat(&cap_params.frame);
     cvDestroyAllWindows();
 
     return err;
