@@ -3,7 +3,7 @@ CFLAGS=-Wall -Wextra -Wpedantic -g
 
 SRC=$(wildcard *.c)
 LIB=`pkg-config --cflags --libs opencv`
-BIN=pj3_vis
+#BIN=pj3_vis
 
 #$(BIN) : $(SRC)
 #	$(CC) $(CFLAGS) -o $(BIN) $^ -I. $(LIB)
@@ -17,8 +17,6 @@ HMOG : homography.c main.c
 	$(CC) $(CFLAGS) -o hmog $^ -I. $(LIB)
 
 TRACK:
-
-DETECT:
 
 clean:
 	echo "Cleaning binaries..."
