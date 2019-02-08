@@ -88,10 +88,13 @@ exit:
 }
 
 void cam_destroy_frame(IplImage **frame) {
-    if(!frame ||
+    if(frame && *frame) {
+        cvReleaseImage(frame);
+        *frame = NULL;
+    }
 }
 
-int cam_capture_frame(CvCapture *cam, CvMat *dest) {
+int cam_capture_frame(CvCapture *cam, IplImage *dest) {
     int err = EXIT_SUCCESS;
 
     if(!cam || !dest) {
@@ -100,20 +103,14 @@ int cam_capture_frame(CvCapture *cam, CvMat *dest) {
         goto exit;
     }
 
-    IplImage *framebuf = cvQueryFrame(cam);
-    if(!framebuf) {
-        fprintf(stderr, "Failed to get frame!\n");
+    IplImage *curr_frame = cvQueryFrame(cam);
+    if(!curr_frame) {
+        fprintf(stderr, "Failed to get new frame!\n");
         err = EXIT_FAILURE;
         goto exit;
     }
 
-    if(dest->rows != framebuf->height || dest->cols != framebuf->width) {
-        fprintf(stderr, "Frame-Matrix size mismatch!\n");
-        err = EXIT_FAILURE;
-        goto exit;
-    }
-
-    dest = cvGetMat(framebuf, dest, NULL, 0);
+    cvCopy(curr_frame, dest, NULL);
 
 exit:
 
