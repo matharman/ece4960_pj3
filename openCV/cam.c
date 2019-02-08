@@ -8,28 +8,49 @@
 
 #include "include/cam.h"
 
-#define FRAME_RATE 60
-#define FRAME_SIZE CLEYE_VGA
-#define FRAME_FORMAT CLEYE_COLOR_RAW
-
-#ifndef CAM_EXPOSURE
-    #define CAM_EXPOSURE 511
-#endif
-
-#ifndef CAM_GAIN
-    #define CAM_GAIN 0
-#endif
+#define CAM_FRAMERATE 60
+#define CAM_EXPOSURE 511
+#define CAM_GAIN 0
 
 CvCapture *cam_init(void) {
-    CvCapture *new = NULL;
+    int err = 0;
 
-    new = cvCaptureFromCAM(0);
+    CvCapture *new = cvCaptureFromCAM(0);
     if(!new) {
-        fprintf(stderr, "Failed to open video capture\n");
+        fprintf(stderr, "Failed to open video capture!\n");
+        err = -1;
         goto exit;
     }
+
+#ifdef CAM_FRAMERATE
+    if(cvSetCaptureProperty(new, CV_CAP_PROP_FPS, (double)CAM_FRAMERATE) == 0) {
+        fprintf(stderr, "Failed to set Cam FPS\n");
+        err = -1;
+        goto exit;
+    }
+#endif
+
+#ifdef CAM_EXPOSURE
+    if(cvSetCaptureProperty(new, CV_CAP_PROP_EXPOSURE, (double)CAM_EXPOSURE) == 0) {
+        fprintf(stderr, "Failed to set Cam FPS\n");
+        err = -1;
+        goto exit;
+    }
+#endif
+
+#ifdef CAM_GAIN
+    if(cvSetCaptureProperty(new, CV_CAP_PROP_GAIN, (double)CAM_GAIN) == 0) {
+        fprintf(stderr, "Failed to set Cam FPS\n");
+        err = -1;
+        goto exit;
+    }
+#endif
     
 exit:
+
+    if(err == -1 && new) {
+        cam_destroy(&new);
+    }
     
     return new;
 }
@@ -37,7 +58,7 @@ exit:
 void cam_destroy(CvCapture ** cam) {
     if(cam) {
         cvReleaseCapture(cam);
-        cam = NULL;
+        *cam = NULL;
     }
 }
 
