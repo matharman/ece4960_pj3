@@ -22,23 +22,19 @@ CvCapture *cam_init(void) {
         goto exit;
     }
 
-#ifdef CAM_FRAMERATE
+#if 0
     if(cvSetCaptureProperty(new, CV_CAP_PROP_FPS, (double)CAM_FRAMERATE) == 0) {
         fprintf(stderr, "Failed to set Cam FPS\n");
         err = -1;
         goto exit;
     }
-#endif
 
-#ifdef CAM_EXPOSURE
     if(cvSetCaptureProperty(new, CV_CAP_PROP_EXPOSURE, (double)CAM_EXPOSURE) == 0) {
         fprintf(stderr, "Failed to set Cam FPS\n");
         err = -1;
         goto exit;
     }
-#endif
 
-#ifdef CAM_GAIN
     if(cvSetCaptureProperty(new, CV_CAP_PROP_GAIN, (double)CAM_GAIN) == 0) {
         fprintf(stderr, "Failed to set Cam FPS\n");
         err = -1;

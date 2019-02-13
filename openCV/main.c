@@ -2,7 +2,10 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+#include <opencv2/core/types_c.h>
+
 #include "include/cam.h"
+#include "include/track.h"
 
 struct video_cap_ptrs {
     CvCapture *cam;
@@ -14,6 +17,11 @@ void *video_cap_thread(void *userdata) {
     struct video_cap_ptrs *params = (struct video_cap_ptrs *)userdata;
     CvCapture * cam = params->cam;
     IplImage *frame = params->frame;
+    IplImage *grayscale = cvCreateImage(cvSize(frame->width, frame->height), IPL_DEPTH_8U, 1);
+
+    CvMemStorage *circles_storage = cvCreateMemStorage(0);
+    //CvSeq *circles = cvCreateSeq(0, sizeof(CvSeq), sizeof(CvPoint3D32f), seq_buf);
+    CvSeq *circles = NULL;
 
     printf("Press any key to exit!\n");
     while(1) {
@@ -21,7 +29,14 @@ void *video_cap_thread(void *userdata) {
             fprintf(stderr, "Frame capture failed!\n");
             return NULL;
         }
+        
+        cvCvtColor(frame, grayscale, CV_BGR2GRAY);
+        circles = cvHoughCircles(grayscale, circles_storage, CV_HOUGH_GRADIENT, 1, frame->height / 4, 100, 100, 200, 100);
 
+        CvPoint3D32f circle;
+        cvSeqPop(circles, &circle);
+    
+        cvCircle(frame, cvPoint(circle.x, circle.y), circle.z, cvScalar(0, 0, 0, 0), 10, 8, 0);
         cvShowImage("Debug Stream", frame);
         if(cvWaitKey(1) != -1) {
             break;
