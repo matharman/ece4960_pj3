@@ -3,8 +3,8 @@
 
 #define HOUGH_PARAM_1 100
 #define HOUGH_PARAM_2 60
-#define HOUGH_MIN_RADIUS 0
-#define HOUGH_MAX_RADIUS 1000
+#define HOUGH_MIN_RADIUS 30
+#define HOUGH_MAX_RADIUS 500
 
 using namespace cv;
 using namespace std;
@@ -23,6 +23,6 @@ void Track::hsv_threshold(Mat hsv, Mat &thres, Scalar hue_lim, Scalar sat_lim, S
  * each circle */
 void Track::detect_circles(Mat thres, vector<Vec3f> &circles) {
     HoughCircles(thres, circles, CV_HOUGH_GRADIENT, 1, 
-            0, HOUGH_PARAM_1, HOUGH_PARAM_2,
+            thres.rows / 16, HOUGH_PARAM_1, HOUGH_PARAM_2,
             HOUGH_MIN_RADIUS, HOUGH_MAX_RADIUS);
 }
