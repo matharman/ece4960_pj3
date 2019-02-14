@@ -4,13 +4,13 @@
 
 #include "include/track.h"
 
-#define HSV_LIM_H (Scalar(24, 40))
-#define HSV_LIM_S (Scalar(255, 232))
-#define HSV_LIM_V (Scalar(194, 255))
+#define HSV_LIM_H (Scalar(28, 40))
+#define HSV_LIM_S (Scalar(135, 255))
+#define HSV_LIM_V (Scalar(215, 255))
 
 #define CIRCLE_COLOR_RGB (Scalar(255, 0, 255))
 #define CIRCLE_THICKNESS 3
-#define CIRCLE_LINE_TYPE CV_AA
+#define CIRCLE_LINE_TYPE 8
 
 using namespace std;
 using namespace cv;
@@ -37,17 +37,17 @@ void *video_cap_thread(void *userdata) {
         cvtColor(frame, hsv, CV_BGR2HSV);
 
         /* Threshold HSV according to compile time parameters */
-        thres = hsv_threshold(hsv, HSV_LIM_H, HSV_LIM_S, HSV_LIM_V);
-        circles = detect_circles(thres);
+        hsv_threshold(hsv, thres, HSV_LIM_H, HSV_LIM_S, HSV_LIM_V);
+        detect_circles(frame, circles);
 
-        for(size_t i = 0; i < circles.size(); i++) {
+        if(circles.size()) {
             /* Draw circle center */
-            circle(frame, TRACK_CIRCLE_CENTER(circles[i]), 1,
+            circle(frame, TRACK_CIRCLE_CENTER(circles[0]), 1,
                     CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE);
 
             /* Draw circle contour */
-            circle(frame, TRACK_CIRCLE_CENTER(circles[i]), 
-                    TRACK_CIRCLE_RADIUS(circles[i]), CIRCLE_COLOR_RGB, 
+            circle(frame, TRACK_CIRCLE_CENTER(circles[0]), 
+                    TRACK_CIRCLE_RADIUS(circles[0]), CIRCLE_COLOR_RGB, 
                     CIRCLE_THICKNESS, CIRCLE_LINE_TYPE);
         }
         

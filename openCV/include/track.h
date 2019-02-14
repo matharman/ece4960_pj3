@@ -11,13 +11,13 @@ namespace Track {
 
     /* Given an HSV frame, return the thresholded HSV
      * for hue_lim*, sat_lim*, v_lim* */
-    cv::Mat hsv_threshold(cv::Mat hsv, 
+    void hsv_threshold(cv::Mat hsv, cv::Mat &thres,
             cv::Scalar hue_lim, cv::Scalar sat_lim, cv::Scalar val_lim);
 
     /* Detect circles in the HSV-thresholded image 
      * and return vector containg [x, y, radius] for
      * each circle */
-    std::vector<cv::Vec3f> detect_circles(cv::Mat thres);
+    void detect_circles(cv::Mat thres, std::vector<cv::Vec3f> &circles);
 }
 
 #endif
