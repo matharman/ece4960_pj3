@@ -1,22 +1,13 @@
-CC=gcc
+CC=g++
 CFLAGS=-Wall -Wextra -Wpedantic -g
 
-SRC=$(wildcard *.c)
+#SRC=$(wildcard *.c)
+SRC=main.cpp
 LIB=`pkg-config --cflags --libs opencv`
-#BIN=pj3_vis
+BIN=vis
 
-#$(BIN) : $(SRC)
-#	$(CC) $(CFLAGS) -o $(BIN) $^ -I. $(LIB)
-
-all: CAM HMOG
-
-CAM : cam.c main.c
-	$(CC) $(CFLAGS) -o cam $^ -I. $(LIB)
-
-HMOG : homography.c main.c
-	$(CC) $(CFLAGS) -o hmog $^ -I. $(LIB)
-
-TRACK:
+$(BIN) : $(SRC)
+	$(CC) $(CFLAGS) -o $(BIN) $^ -I. $(LIB)
 
 clean:
 	echo "Cleaning binaries..."
