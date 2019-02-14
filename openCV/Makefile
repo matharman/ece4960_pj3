@@ -2,7 +2,7 @@ CC=g++
 CFLAGS=-Wall -Wextra -Wpedantic -g
 
 #SRC=$(wildcard *.c)
-SRC=main.cpp
+SRC=$(wildcard *.cpp)
 LIB=`pkg-config --cflags --libs opencv`
 BIN=vis
 

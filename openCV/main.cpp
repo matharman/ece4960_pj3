@@ -1,49 +1,59 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include<opencv2/opencv.hpp>
+#include <iostream>
 #include <pthread.h>
 
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
+#include "include/track.h"
 
+#define HSV_LIM_H (Scalar(24, 40))
+#define HSV_LIM_S (Scalar(232, 255))
+#define HSV_LIM_V (Scalar(194, 255))
+
+#define CIRCLE_COLOR_RGB (Scalar(255, 0, 255))
+#define CIRCLE_THICKNESS 3
+#define CIRCLE_LINE_TYPE CV_AA
+
+using namespace std;
 using namespace cv;
-
-struct video_cap_ptrs {
-    VideoCapture cam;
-    Mat frame;
-};
+using namespace Track;
 
 /* Video capture thread */
 void *video_cap_thread(void *userdata) {
-    struct video_cap_ptrs *params = (struct video_cap_ptrs *)userdata;
-    VideoCapture cam = params->cam;
-    Mat frame = params->frame;
-    Mat grayscale;
-    Mat threshold;
-    Mat hsv;
+    (void)userdata;
+
+    VideoCapture cam(0);
+    if(!cam.isOpened()) {
+        cerr << "Failed to open camera!" << endl;
+        return NULL;
+    }
+
+    Mat frame;
+    Mat thres;
     vector<Vec3f> circles;
 
-    printf("Press any key to exit!\n");
+    cout << "Press any key to exit!" << endl;
     while(1) {
+        /* Capture BGR frame, convert to HSV */
         cam.read(frame);
-        
-        cvtColor(frame, hsv, CV_BGR2HSV);
-        inRange(hsv, Scalar(24, 255, 194), Scalar(40, 232, 255), threshold);
-        cvtColor(hsv, threshold, CV_HSV2RGB);
-        cvtColor(threshold, grayscale, CV_RGB2GRAY);
-        HoughCircles(grayscale, circles, CV_HOUGH_GRADIENT, 1, frame.rows / 16, 100, 60, 30, 500);
+        cvtColor(frame, thres, CV_BGR2HSV);
 
-        if(circles.size()) {
-            Vec3i c = circles[0];
-            Point center = Point(c[0], c[1]);
+        /* Threshold HSV according to compile time parameters */
+        thres = hsv_threshold(frame, HSV_LIM_H, HSV_LIM_S, HSV_LIM_V);
+        circles = detect_circles(thres);
 
-            circle(frame, center, 1, Scalar(0, 100, 100), 3, 8);
-            circle(frame, center, c[2], Scalar(255, 0, 255), 3, 8);
+        for(size_t i = 0; i < circles.size(); i++) {
+            /* Draw circle center */
+            circle(frame, TRACK_CIRCLE_CENTER(circles[i]), 1,
+                    CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE);
+
+            /* Draw circle contour */
+            circle(frame, TRACK_CIRCLE_CENTER(circles[i]), 
+                    TRACK_CIRCLE_RADIUS(circles[i]), CIRCLE_COLOR_RGB, 
+                    CIRCLE_THICKNESS, CIRCLE_LINE_TYPE);
         }
-
+        
         imshow("Tracking", frame);
-        imshow("Thresholding", threshold);
-        if(waitKey(1) != -1) {
+        imshow("Thresholding", thres);
+        if(waitKey(1) > 0) {
             break;
         }
     }
@@ -52,49 +62,20 @@ void *video_cap_thread(void *userdata) {
 }
 
 int main(int argc, char* argv[]) {
-
-    int err = EXIT_SUCCESS;
-
     (void)argc;
     (void)argv;
-
-    /* Video capture parameters */
-    struct video_cap_ptrs cap_params;
-
-    cap_params.cam = VideoCapture(0);
-    cap_params.cam.read(cap_params.frame);
-
-    //cap_params.cam = cam_init();
-    //if(!cap_params.cam) {
-    //    fprintf(stderr, "Failed to initialize camera!\n");
-    //    err = EXIT_FAILURE;
-    //    goto exit;
-    //}
-
-    //cap_params.frame = cam_init_frame(cap_params.cam);
-    //if(!cap_params.frame) {
-    //    fprintf(stderr, "Failed to initialize frame buffer!\n");
-    //    err = EXIT_FAILURE;
-    //    goto exit;
-    //}
 
     namedWindow("Tracking", CV_WINDOW_AUTOSIZE);
     namedWindow("Thresholding", CV_WINDOW_AUTOSIZE);
 
     pthread_t cap_thread;
-    pthread_create(&cap_thread, NULL, &video_cap_thread, &cap_params);
+    pthread_create(&cap_thread, NULL, &video_cap_thread, NULL);
     if(!cap_thread) {
-        fprintf(stderr, "Failed to create capture thread!\n");
-        goto exit;
+        cerr << "Failed to create capture thread!" << endl;
+        return EXIT_FAILURE;
     }
 
     pthread_join(cap_thread, NULL);
 
-exit:
-
-    //cam_destroy(&cap_params.cam);
-    //cam_destroy_frame(&cap_params.frame);
-    destroyAllWindows();
-
-    return err;
+    return EXIT_SUCCESS;
 }
