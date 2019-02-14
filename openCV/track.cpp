@@ -1,3 +1,4 @@
+#include <iostream>
 #include "include/track.h"
 
 #define HOUGH_PARAM_1 100
@@ -29,7 +30,10 @@ vector<Vec3f> Track::detect_circles(Mat thres) {
     Mat gray;
 
     cvtColor(thres, rgb, CV_HSV2RGB);
+    cout << "Converted HSV to RGB" << endl;
+
     cvtColor(rgb, gray, CV_RGB2GRAY);
+    cout << "Converted RGB to Gray" << endl;
 
     vector<Vec3f> circles;
     HoughCircles(gray, circles, CV_HOUGH_GRADIENT, 1, 

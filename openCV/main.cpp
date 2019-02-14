@@ -27,17 +27,21 @@ void *video_cap_thread(void *userdata) {
     }
 
     Mat frame;
+    Mat hsv;
     Mat thres;
     vector<Vec3f> circles;
 
     cout << "Press any key to exit!" << endl;
     while(1) {
-        /* Capture BGR frame, convert to HSV */
         cam.read(frame);
-        cvtColor(frame, thres, CV_BGR2HSV);
+        cvtColor(frame, hsv, CV_BGR2HSV);
+        cout << "Converted to HSV" << endl;
 
         /* Threshold HSV according to compile time parameters */
-        thres = hsv_threshold(frame, HSV_LIM_H, HSV_LIM_S, HSV_LIM_V);
+        thres = hsv_threshold(hsv, HSV_LIM_H, HSV_LIM_S, HSV_LIM_V);
+        imshow("Thresholding", thres);
+        cout << "Thresholded HSV" << endl;
+
         circles = detect_circles(thres);
 
         for(size_t i = 0; i < circles.size(); i++) {
@@ -52,7 +56,6 @@ void *video_cap_thread(void *userdata) {
         }
         
         imshow("Tracking", frame);
-        imshow("Thresholding", thres);
         if(waitKey(1) > 0) {
             break;
         }
