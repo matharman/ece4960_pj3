@@ -5,7 +5,7 @@
 #include "include/track.h"
 
 #define HSV_LIM_H (Scalar(24, 40))
-#define HSV_LIM_S (Scalar(232, 255))
+#define HSV_LIM_S (Scalar(255, 232))
 #define HSV_LIM_V (Scalar(194, 255))
 
 #define CIRCLE_COLOR_RGB (Scalar(255, 0, 255))
@@ -32,16 +32,12 @@ void *video_cap_thread(void *userdata) {
     vector<Vec3f> circles;
 
     cout << "Press any key to exit!" << endl;
-    while(1) {
+    while(true) {
         cam.read(frame);
         cvtColor(frame, hsv, CV_BGR2HSV);
-        cout << "Converted to HSV" << endl;
 
         /* Threshold HSV according to compile time parameters */
         thres = hsv_threshold(hsv, HSV_LIM_H, HSV_LIM_S, HSV_LIM_V);
-        imshow("Thresholding", thres);
-        cout << "Thresholded HSV" << endl;
-
         circles = detect_circles(thres);
 
         for(size_t i = 0; i < circles.size(); i++) {
@@ -56,6 +52,7 @@ void *video_cap_thread(void *userdata) {
         }
         
         imshow("Tracking", frame);
+        imshow("Thresholding", thres);
         if(waitKey(1) > 0) {
             break;
         }
