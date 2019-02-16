@@ -1,10 +1,7 @@
-#include <iostream>
 #include "include/track.h"
 
-#define HOUGH_PARAM_1 100
-#define HOUGH_PARAM_2 60
-#define HOUGH_MIN_RADIUS 30
-#define HOUGH_MAX_RADIUS 500
+#define CANNY_PARAM_1 60
+#define CANNY_PARAM_2 120
 
 using namespace cv;
 using namespace std;
@@ -21,8 +18,12 @@ void Track::hsv_threshold(Mat hsv, Mat &thres, Scalar hue_lim, Scalar sat_lim, S
 /* Detect circles in the HSV-thresholded image 
  * and return vector containg [x, y, radius] for
  * each circle */
-void Track::detect_circles(Mat thres, vector<Vec3f> &circles) {
-    HoughCircles(thres, circles, CV_HOUGH_GRADIENT, 1, 
-            thres.rows / 16, HOUGH_PARAM_1, HOUGH_PARAM_2,
-            HOUGH_MIN_RADIUS, HOUGH_MAX_RADIUS);
+void Track::detect_circles(Mat &thres, vector<vector<Point>> &circles) {
+    Mat buf;
+
+    erode(thres, buf, Mat(), Point(-1, -1), 4);
+    dilate(buf, thres, Mat(), Point(-1, -1), 5);
+
+    Canny(thres, buf, CANNY_PARAM_1, CANNY_PARAM_2, 3);
+    findContours(buf, circles, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
 }

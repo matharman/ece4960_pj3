@@ -17,7 +17,7 @@ namespace Track {
     /* Detect circles in the HSV-thresholded image 
      * and return vector containg [x, y, radius] for
      * each circle */
-    void detect_circles(cv::Mat thres, std::vector<cv::Vec3f> &circles);
+    void detect_circles(cv::Mat &thres, std::vector<std::vector<cv::Point>> &circles);
 }
 
 #endif

@@ -4,14 +4,15 @@ CFLAGS=-Wall -Wextra -Wpedantic -g
 #SRC=$(wildcard *.c)
 SRC=$(wildcard *.cpp)
 LIB=`pkg-config --cflags --libs opencv`
-BIN=vis
 
-$(BIN) : $(SRC)
-	$(CC) $(CFLAGS) -o $(BIN) $^ -I. $(LIB)
+all : bin gui
+
+bin : $(SRC)
+	$(CC) $(CFLAGS) -o vis $^ -I. $(LIB)
+
+gui : $(SRC)
+	$(CC) $(CFLAGS) -o gui-vis $^ -I. $(LIB) -DGUI_DEMO
 
 clean:
-	echo "Cleaning binaries..."
-	rm pj3_vis
-	rm cam
-	rm hmog
-	echo "Done!"
+	rm -f gui
+	rm -f vis

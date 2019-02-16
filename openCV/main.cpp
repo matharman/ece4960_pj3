@@ -1,14 +1,10 @@
-#include<opencv2/opencv.hpp>
 #include <iostream>
+#include <ctime>
 #include <thread>
-#include <mutex>
 #include <queue>
+#include<opencv2/opencv.hpp>
 
 #include "include/track.h"
-
-//#define HSV_LIM_H(min, max) (Scalar(min, max))
-//#define HSV_LIM_S(min, max) (Scalar(min, max))
-//#define HSV_LIM_V(min, max) (Scalar(min, max))
 
 #define CIRCLE_COLOR_RGB (Scalar(255, 0, 255))
 #define CIRCLE_THICKNESS 3
@@ -19,11 +15,10 @@ using namespace cv;
 using namespace Track;
 
 queue<Mat> frame_queue;
-mutex q_mtx;
+bool cap_quit = false;
 
 /* Video capture thread */
 void video_cap_thread(void) {
-    unique_lock<mutex> q_lock(q_mtx, defer_lock);
 
     VideoCapture cam(0);
     if(!cam.isOpened()) {
@@ -33,12 +28,12 @@ void video_cap_thread(void) {
 
     Mat frame;
 
-    while(true) {
+    while(!cap_quit) {
         cam.read(frame);
-        q_lock.lock();
         frame_queue.push(frame);
-        q_lock.unlock();
     }
+
+    cam.release();
 }
 
 int main(int argc, char* argv[]) {
@@ -49,69 +44,58 @@ int main(int argc, char* argv[]) {
     Scalar hsv_sat_lim(100, 255);
     Scalar hsv_val_lim(100, 255);
 
-#if 0
-    namedWindow("Parameters", CV_WINDOW_AUTOSIZE);
-    createTrackbar("Hue Hi", "Parameters", (int *)&hsv_hue_lim[0], 255, NULL, NULL);
-    createTrackbar("Hue Lo", "Parameters", (int *)&hsv_hue_lim[1], 255, NULL, NULL);
-    createTrackbar("Sat Hi", "Parameters", (int *)&hsv_sat_lim[0], 255, NULL, NULL);
-    createTrackbar("Sat Lo", "Parameters", (int *)&hsv_sat_lim[1], 255, NULL, NULL);
-    createTrackbar("Val Hi", "Parameters", (int *)&hsv_val_lim[0], 255, NULL, NULL);
-    createTrackbar("Val Lo", "Parameters", (int *)&hsv_val_lim[1], 255, NULL, NULL);
-#endif
+#ifdef GUI_DEMO
     namedWindow("Tracking", CV_WINDOW_AUTOSIZE);
     namedWindow("Thresholding", CV_WINDOW_AUTOSIZE);
+#endif
 
     thread video_capture(video_cap_thread);
-    unique_lock<mutex> q_lock(q_mtx, defer_lock);
 
-    Mat frame;
     Mat hsv;
-    Mat gray;
     Mat thres;
-    Mat canny;
     vector<vector<Point>> circles;
 
-    cout << "Press any key to exit" << endl;
+#ifdef GUI_DEMO
+    cout << "Press any key to exit..." << endl;
+#endif
+
+    clock_t start;
+    clock_t end;
+
     while(true) {
         if(frame_queue.empty()) {
             continue;
         }
 
-        q_lock.lock();
-        frame = frame_queue.front();
-        frame_queue.pop();
-        q_lock.unlock();
-
-        cvtColor(frame, hsv, CV_BGR2HSV);
+        start = clock();
+        cvtColor(frame_queue.front(), hsv, CV_BGR2HSV);
 
         /* Threshold HSV according to compile time parameters */
         hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
-        //detect_circles(thres, circles);
-
-        Canny(thres, canny, 60, 120, 3);
-        findContours(canny, circles, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-        gray = Mat::zeros(canny.size(), CV_8UC3);
+        detect_circles(thres, circles);
 
         for(size_t i = 0; i < circles.size(); i++) {
-#if 0
-            /* Draw circle center */
-            circle(frame, TRACK_CIRCLE_CENTER(circles[i]), 1,
-                    CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE);
-
-            /* Draw circle contour */
-            circle(frame, TRACK_CIRCLE_CENTER(circles[i]), 
-                    TRACK_CIRCLE_RADIUS(circles[i]), CIRCLE_COLOR_RGB, 
-                    CIRCLE_THICKNESS, CIRCLE_LINE_TYPE);
-#endif
-            drawContours(frame, circles, i, Scalar(255, 0, 255), 2, 8, noArray(), 0, Point());
+            drawContours(frame_queue.front(), circles, i, Scalar(255, 0, 255), 2, 8, noArray(), 0, Point());
         }
-        
-        imshow("Tracking", frame);
+
+#ifdef GUI_DEMO
+        imshow("Tracking", frame_queue.front());
         imshow("Thresholding", thres);
         if(waitKey(1) > 0) {
             break;
         }
+#endif
+    
+        frame_queue.pop();
+
+        end = clock();
+        cout << "\rTime: " << 1000 * (end - start) / CLOCKS_PER_SEC << "ms" << flush;
+
     }
+
+    cap_quit = true;
+    queue<Mat>().swap(frame_queue);
+    destroyAllWindows();
 
     return EXIT_SUCCESS;
 }
