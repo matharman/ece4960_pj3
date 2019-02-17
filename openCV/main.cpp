@@ -92,6 +92,7 @@ int main(int argc, char* argv[]) {
     cout << "Press any key to exit..." << endl;
 #endif
 
+    size_t largest_contour;
     while(true) {
         if(frame_queue.empty()) {
             continue;
@@ -99,7 +100,6 @@ int main(int argc, char* argv[]) {
 
         cvtColor(frame_queue.front(), hsv, CV_BGR2HSV);
 
-        /* Threshold HSV according to compile time parameters */
 #ifdef GUI_DEMO
         hsv_hue_lim = Scalar(hsv_hue_lo, hsv_hue_hi);
         hsv_sat_lim = Scalar(hsv_sat_lo, hsv_sat_hi);
@@ -108,20 +108,28 @@ int main(int argc, char* argv[]) {
         hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
         detect_circles(thres, circles);
 
-        if(centroids.size()) {
-            prev = centroids[0];
-        }
-        
-        centroids = vector<Point2f>(circles.size());
-        calc_centroids(centroids, circles);
+        if(circles.size()) {
+            centroids = vector<Point2f>(circles.size());
+            calc_centroids(centroids, circles);
 
-        //circle_data << centroids[0].x << "," << centroids[0].y << "," << VELOCITY(centroids[0], prev) << endl;
+            largest_contour = 0;
+            for(size_t i = 0; i < circles.size(); i++) {
+                if(arcLength(circles[largest_contour], true) < arcLength(circles[i], true)) {
+                    largest_contour = i;
+                }
+            }
 
-        for(size_t i = 0; i < circles.size(); i++) {
-            drawContours(frame_queue.front(), circles, i, 
+            drawContours(frame_queue.front(), circles, largest_contour, 
                     CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
-            circle(frame_queue.front(), centroids[i], 3, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+            circle(frame_queue.front(), centroids[largest_contour], 3, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+
+            circle_data << centroids[largest_contour].x << ",";
+            circle_data << centroids[largest_contour].y << ",";
+            circle_data << VELOCITY(centroids[largest_contour], prev) << endl;
+
+            prev = centroids[largest_contour];
         }
+
 
 #ifdef GUI_DEMO
         imshow("Tracking", frame_queue.front());
