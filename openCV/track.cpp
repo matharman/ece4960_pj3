@@ -3,6 +3,9 @@
 #define CANNY_PARAM_1 60
 #define CANNY_PARAM_2 120
 
+#define EROSIONS 3
+#define DILATIONS 5
+
 using namespace cv;
 using namespace std;
 
@@ -21,9 +24,22 @@ void Track::hsv_threshold(Mat hsv, Mat &thres, Scalar hue_lim, Scalar sat_lim, S
 void Track::detect_circles(Mat &thres, vector<vector<Point>> &circles) {
     Mat buf;
 
-    erode(thres, buf, Mat(), Point(-1, -1), 4);
-    dilate(buf, thres, Mat(), Point(-1, -1), 5);
+    erode(thres, buf, Mat(), Point(-1, -1), EROSIONS);
+    dilate(buf, thres, Mat(), Point(-1, -1), DILATIONS);
 
     Canny(thres, buf, CANNY_PARAM_1, CANNY_PARAM_2, 3);
     findContours(buf, circles, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
+}
+
+/* Calculate the centroids of circles */
+void Track::calc_centroids(vector<Point2f> &centroids, vector<vector<Point>> circles) {
+    vector<Moments> mu(circles.size());
+
+    for(size_t i = 0; i < mu.size(); i++) {
+        mu[i] = moments(circles[i], true);
+    }
+
+    for(size_t i = 0; i < mu.size(); i++) {
+        centroids[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+    }
 }
