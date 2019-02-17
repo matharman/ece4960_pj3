@@ -7,6 +7,10 @@
 
 #include "include/track.h"
 
+#define HUE_LIM_DEFAULT Scalar(0, 60)
+#define SAT_LIM_DEFAULT Scalar(100, 255)
+#define VAL_LIM_DEFAULT Scalar(200, 255)
+
 #define CIRCLE_COLOR_RGB (Scalar(255, 0, 255))
 #define CIRCLE_THICKNESS 3
 #define CIRCLE_LINE_TYPE 8
@@ -19,6 +23,10 @@
 using namespace std;
 using namespace cv;
 using namespace Track;
+
+Scalar hsv_hue_lim = HUE_LIM_DEFAULT;
+Scalar hsv_sat_lim = SAT_LIM_DEFAULT;
+Scalar hsv_val_lim = VAL_LIM_DEFAULT;
 
 queue<Mat> frame_queue;
 bool cap_quit = false;
@@ -51,13 +59,25 @@ int main(int argc, char* argv[]) {
     circle_data.open("circle_data.txt");
     circle_data << "X, Y, Vel\n";
 
-    Scalar hsv_hue_lim(20, 50);
-    Scalar hsv_sat_lim(100, 255);
-    Scalar hsv_val_lim(100, 255);
-
 #ifdef GUI_DEMO
+    namedWindow("Thresh Params", CV_WINDOW_AUTOSIZE);
     namedWindow("Tracking", CV_WINDOW_AUTOSIZE);
     namedWindow("Thresholding", CV_WINDOW_AUTOSIZE);
+
+    int hsv_hue_hi = HUE_LIM_DEFAULT[1];
+    int hsv_hue_lo = HUE_LIM_DEFAULT[0];
+    int hsv_sat_hi = SAT_LIM_DEFAULT[1];
+    int hsv_sat_lo = SAT_LIM_DEFAULT[0];
+    int hsv_val_hi = VAL_LIM_DEFAULT[1];
+    int hsv_val_lo = VAL_LIM_DEFAULT[0];
+
+    createTrackbar("Hue Hi", "Thresh Params", &hsv_hue_hi, 180, NULL, NULL);
+    createTrackbar("Hue Lo", "Thresh Params", &hsv_hue_lo, 180, NULL, NULL);
+    createTrackbar("Sat Hi", "Thresh Params", &hsv_sat_hi, 255, NULL, NULL);
+    createTrackbar("Sat Lo", "Thresh Params", &hsv_sat_lo, 255, NULL, NULL);
+    createTrackbar("Val Hi", "Thresh Params", &hsv_val_hi, 255, NULL, NULL);
+    createTrackbar("Val Lo", "Thresh Params", &hsv_val_lo, 255, NULL, NULL);
+
 #endif
 
     thread video_capture(video_cap_thread);
@@ -72,18 +92,19 @@ int main(int argc, char* argv[]) {
     cout << "Press any key to exit..." << endl;
 #endif
 
-    //clock_t start;
-    //clock_t end;
-
     while(true) {
         if(frame_queue.empty()) {
             continue;
         }
 
-        //start = clock();
         cvtColor(frame_queue.front(), hsv, CV_BGR2HSV);
 
         /* Threshold HSV according to compile time parameters */
+#ifdef GUI_DEMO
+        hsv_hue_lim = Scalar(hsv_hue_lo, hsv_hue_hi);
+        hsv_sat_lim = Scalar(hsv_sat_lo, hsv_sat_hi);
+        hsv_val_lim = Scalar(hsv_val_lo, hsv_val_hi);
+#endif
         hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
         detect_circles(thres, circles);
 
@@ -93,8 +114,8 @@ int main(int argc, char* argv[]) {
         
         centroids = vector<Point2f>(circles.size());
         calc_centroids(centroids, circles);
-        /* X, Y, Vel */
-        circle_data << centroids[0].x << "," << centroids[0].y << "," << VELOCITY(centroids[0], prev) << endl;
+
+        //circle_data << centroids[0].x << "," << centroids[0].y << "," << VELOCITY(centroids[0], prev) << endl;
 
         for(size_t i = 0; i < circles.size(); i++) {
             drawContours(frame_queue.front(), circles, i, 
@@ -111,10 +132,6 @@ int main(int argc, char* argv[]) {
 #endif
     
         frame_queue.pop();
-
-        //end = clock();
-        //cout << "\rTime: " << 1000 * (end - start) / CLOCKS_PER_SEC << "ms" << flush;
-
     }
 
     cap_quit = true;
