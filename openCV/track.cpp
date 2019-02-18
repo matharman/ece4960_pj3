@@ -1,8 +1,5 @@
 #include "include/track.h"
 
-#define CANNY_PARAM_1 60
-#define CANNY_PARAM_2 120
-
 #define EROSIONS 3
 #define DILATIONS 5
 
@@ -21,13 +18,13 @@ void Track::hsv_threshold(Mat hsv, Mat &thres, Scalar hue_lim, Scalar sat_lim, S
 /* Detect circles in the HSV-thresholded image 
  * and return vector containg [x, y, radius] for
  * each circle */
-void Track::detect_circles(Mat &thres, vector<vector<Point>> &circles) {
+void Track::detect_circles(Mat &thres, vector<vector<Point>> &circles, int canny_param) {
     Mat buf;
 
     erode(thres, buf, Mat(), Point(-1, -1), EROSIONS);
     dilate(buf, thres, Mat(), Point(-1, -1), DILATIONS);
 
-    Canny(thres, buf, CANNY_PARAM_1, CANNY_PARAM_2, 3);
+    Canny(thres, buf, canny_param, canny_param * 2, 3);
     findContours(buf, circles, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
 }
 

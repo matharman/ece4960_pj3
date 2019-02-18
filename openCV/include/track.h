@@ -17,7 +17,7 @@ namespace Track {
     /* Detect circles in the HSV-thresholded image 
      * and return vector containg [x, y, radius] for
      * each circle */
-    void detect_circles(cv::Mat &thres, std::vector<std::vector<cv::Point>> &circles);
+    void detect_circles(cv::Mat &thres, std::vector<std::vector<cv::Point>> &circles, int canny_param);
 
     /* Calculate the centroids of circles in a list of contours */
     void calc_centroids(std::vector<cv::Point2f> &centroids, std::vector<std::vector<cv::Point>> circles);

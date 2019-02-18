@@ -7,6 +7,8 @@
 
 #include "include/track.h"
 
+#define CANNY_DEFAULT 60
+
 #define HUE_LIM_DEFAULT Scalar(0, 60)
 #define SAT_LIM_DEFAULT Scalar(100, 255)
 #define VAL_LIM_DEFAULT Scalar(200, 255)
@@ -17,6 +19,7 @@
 
 #define DELTA(curr, prev) \
     (curr - prev)
+
 #define VELOCITY(curr, prev) \
     (DELTA(curr.y, prev.y) / DELTA(curr.x, prev.x))
 
@@ -59,8 +62,9 @@ int main(int argc, char* argv[]) {
     circle_data.open("circle_data.txt");
     circle_data << "X, Y, Vel\n";
 
-#ifdef GUI_DEMO
     namedWindow("Thresh Params", CV_WINDOW_AUTOSIZE);
+
+#ifdef GUI_DEMO
     namedWindow("Tracking", CV_WINDOW_AUTOSIZE);
     namedWindow("Thresholding", CV_WINDOW_AUTOSIZE);
 
@@ -79,6 +83,9 @@ int main(int argc, char* argv[]) {
     createTrackbar("Val Lo", "Thresh Params", &hsv_val_lo, 255, NULL, NULL);
 
 #endif
+
+    int canny_param = CANNY_DEFAULT;
+    createTrackbar("Canny Thres", "Thresh Params", &canny_param, 255, NULL, NULL);
 
     thread video_capture(video_cap_thread);
 
@@ -106,7 +113,7 @@ int main(int argc, char* argv[]) {
         hsv_val_lim = Scalar(hsv_val_lo, hsv_val_hi);
 #endif
         hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
-        detect_circles(thres, circles);
+        detect_circles(thres, circles, canny_param);
 
         if(circles.size()) {
             centroids = vector<Point2f>(circles.size());
@@ -121,7 +128,7 @@ int main(int argc, char* argv[]) {
 
             drawContours(frame_queue.front(), circles, largest_contour, 
                     CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
-            circle(frame_queue.front(), centroids[largest_contour], 3, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+            //circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
 
             circle_data << centroids[largest_contour].x << ",";
             circle_data << centroids[largest_contour].y << ",";
@@ -145,7 +152,6 @@ int main(int argc, char* argv[]) {
     cap_quit = true;
     queue<Mat>().swap(frame_queue);
     destroyAllWindows();
-
     circle_data.close();
 
     return EXIT_SUCCESS;
