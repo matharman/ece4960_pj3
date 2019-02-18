@@ -3,9 +3,14 @@
 #include <ctime>
 #include <thread>
 #include <queue>
-#include<opencv2/opencv.hpp>
+
+#include <opencv2/opencv.hpp>
+#include <unistd.h>
+#include <wiringPi.h>
+#include <wiringSerial.h>
 
 #include "include/track.h"
+#include "include/uart.h"
 
 #define CANNY_DEFAULT 60
 
@@ -26,6 +31,7 @@
 using namespace std;
 using namespace cv;
 using namespace Track;
+using namespace Uart;
 
 Scalar hsv_hue_lim = HUE_LIM_DEFAULT;
 Scalar hsv_sat_lim = SAT_LIM_DEFAULT;
@@ -51,6 +57,26 @@ void video_cap_thread(void) {
     }
 
     cam.release();
+}
+
+/* Uart thread */
+void uart_thread(void) {
+    if(uart_init() != EXIT_SUCCESS) {
+        cerr << "Failed to initialize uart\n";
+        return;
+    }
+
+    float seq[] = {0, 90, 180};
+
+    size_t i;
+    while(true) {
+        for(i = 0; i < 3; i++) {
+            uart_write(&seq[i], sizeof(float));
+            sleep(5);
+        }
+    }
+
+    uart_release();
 }
 
 int main(int argc, char* argv[]) {
@@ -88,6 +114,7 @@ int main(int argc, char* argv[]) {
     createTrackbar("Canny Thres", "Thresh Params", &canny_param, 255, NULL, NULL);
 
     thread video_capture(video_cap_thread);
+    thread uart_send(uart_thread);
 
     Mat hsv;
     Mat thres;

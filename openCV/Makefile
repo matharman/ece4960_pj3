@@ -3,7 +3,7 @@ CFLAGS=-Wall -Wextra -Wpedantic -g
 
 #SRC=$(wildcard *.c)
 SRC=$(wildcard *.cpp)
-LIB=`pkg-config --cflags --libs opencv`
+LIB= -lwiringPi `pkg-config --cflags --libs opencv`
 
 all : bin gui
 
