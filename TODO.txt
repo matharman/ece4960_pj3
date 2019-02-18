@@ -1,5 +1,2 @@
---Clean up cam interface bc massive memleaks -- remove cvCloneImage() from loop, do copying instead (cam.c, cam.h)
---Circle recognition (detect.c, detect.h)
---HSV recognition redundancy (detect.c, detect.h)
---Homography system (homography.c, homography.h)
---Motion tracking (track.c, track.h)
+--Homography
+--UART
