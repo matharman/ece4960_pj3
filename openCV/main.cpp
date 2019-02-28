@@ -42,6 +42,7 @@ queue<clock_t> cap_time_queue;
 bool cap_quit = false;
 bool uart_quit = false;
 
+#if 0
 static Point2f velocity(Point2f curr, clock_t curr_time, Point2f prev, clock_t prev_time) {
     double delta_t = (curr_time - prev_time) / CLOCKS_PER_MSEC;
     cout << "Delta T " << delta_t << endl;;
@@ -49,6 +50,39 @@ static Point2f velocity(Point2f curr, clock_t curr_time, Point2f prev, clock_t p
     float v_y = (curr.y - prev.y) / delta_t;
 
     return Point2f(v_x, v_y);
+}
+#endif
+
+static void update_N_velocity(Point2f curr_pos, clock_t curr_time, Point2f N_pos[], Point2f N_vel[], clock_t N_time[]) {
+    double delta_t = (curr_time - N_time[N_FRAME_COUNT - 1]) / CLOCKS_PER_MSEC;
+    cout << "Delta T " << delta_t << endl;;
+
+    float v_x = (curr_pos.x - N_pos[N_FRAME_COUNT].x) / delta_t;
+    float v_y = (curr_pos.y - N_pos[N_FRAME_COUNT].y) / delta_t;
+    Point2f curr_vel = Point2f(v_x, v_y);
+
+    /* Shift oldest N_* out */
+    for(size_t i = 0; i < N_FRAME_COUNT - 1; i++) {
+        N_pos[i] = N_pos[i + 1];
+        N_vel[i] = N_vel[i + 1];
+        N_time[i] = N_time[i + 1];
+    }
+
+    N_pos[N_FRAME_COUNT - 1] = curr_pos;
+    N_vel[N_FRAME_COUNT - 1] = curr_vel;
+    N_time[N_FRAME_COUNT - 1] = curr_time;
+}
+
+static Point2f avg_N_vel(Point2f N_vel[]) {
+    float avg_v_x = 0;
+    float avg_v_y = 0;
+
+    for(size_t i = 0; i < N_FRAME_COUNT; i++) {
+        avg_v_x += N_vel[i].x;
+        avg_v_y += N_vel[i].y;
+    }
+
+    return Point2f(avg_v_x / N_FRAME_COUNT, avg_v_y / N_FRAME_COUNT);
 }
 
 /* Video capture thread */
@@ -119,8 +153,6 @@ int main(int argc, char* argv[]) {
 
     int canny_param = CANNY_DEFAULT;
 
-    cout << "VelX,VelY" << endl;
-
 #ifdef GUI_DEMO
     namedWindow("Tracking", CV_WINDOW_AUTOSIZE);
     namedWindow("Thresholding", CV_WINDOW_AUTOSIZE);
@@ -153,6 +185,10 @@ int main(int argc, char* argv[]) {
     Point2f prev_centroid(0, 0);
     clock_t prev_time = 0;
 
+    Point2f N_vel[N_FRAME_COUNT] = { Point2f(0, 0) };
+    Point2f N_centroids[N_FRAME_COUNT] = { Point2f(0, 0) };
+    clock_t N_time[N_FRAME_COUNT] = { 0 };
+
 #ifdef GUI_DEMO
     cout << "Press any key to exit..." << endl;
 #endif
@@ -180,8 +216,8 @@ int main(int argc, char* argv[]) {
 
 	    largest_contour = 0;
 	    for(size_t i = 0; i < circles.size(); i++) {
-		if(arcLength(circles[largest_contour], true) < arcLength(circles[i], true)) {
-		    largest_contour = i;
+		if(arcLength(circles[largest_contour], true) < arcLength(circles[i], true)) { 
+                    largest_contour = i;
 		}
 	    }
 
@@ -198,10 +234,8 @@ int main(int argc, char* argv[]) {
 	    }
 #endif
 
-            vel = velocity(Point2f(640, 480) - centroids[largest_contour], cap_time_queue.front(),
-                    prev_centroid, prev_time);
-
-            cout << vel.x << "," << vel.y << endl;
+            update_N_velocity(centroids[largest_contour], cap_time_queue.front(), N_centroids, N_vel, N_time);
+            vel = avg_N_vel(N_vel);
 
             uart_mtx.lock();
             uart_state[0] = 640 - centroids[largest_contour].x;
@@ -213,6 +247,12 @@ int main(int argc, char* argv[]) {
             prev_centroid = centroids[largest_contour];
             prev_time = cap_time_queue.front();
         }
+        else {
+            update_N_velocity(prev_centroid, clock(), N_centroids, N_vel, N_time);
+            vel = avg_N_vel(N_vel);
+        }
+
+        cout << "Avg N Velocity " << vel << endl;
 
 	frame_queue.pop();
 	cap_time_queue.pop();
