@@ -119,6 +119,8 @@ int main(int argc, char* argv[]) {
 
     int canny_param = CANNY_DEFAULT;
 
+    cout << "VelX,VelY" << endl;
+
 #ifdef GUI_DEMO
     namedWindow("Tracking", CV_WINDOW_AUTOSIZE);
     namedWindow("Thresholding", CV_WINDOW_AUTOSIZE);
@@ -199,7 +201,7 @@ int main(int argc, char* argv[]) {
             vel = velocity(Point2f(640, 480) - centroids[largest_contour], cap_time_queue.front(),
                     prev_centroid, prev_time);
 
-            cout << "Velocity " << vel << endl;
+            cout << vel.x << "," << vel.y << endl;
 
             uart_mtx.lock();
             uart_state[0] = 640 - centroids[largest_contour].x;
