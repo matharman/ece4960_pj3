@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -Wextra -Wpedantic -g
+CFLAGS=-Wall -Wextra -Wpedantic -g -DN_FRAME_COUNT=10
 
 #SRC=$(wildcard *.c)
 SRC=$(wildcard *.cpp)
