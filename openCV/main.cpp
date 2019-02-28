@@ -40,6 +40,7 @@ Scalar hsv_val_lim = VAL_LIM_DEFAULT;
 queue<Mat> frame_queue;
 queue<clock_t> cap_time_queue;
 bool cap_quit = false;
+bool uart_quit = false;
 
 static Point2f velocity(Point2f curr, clock_t curr_time, Point2f prev, clock_t prev_time) {
     double delta_t = (curr_time - prev_time);
@@ -54,16 +55,28 @@ void video_cap_thread(void) {
 
     VideoCapture cam(0);
     if(!cam.isOpened()) {
-        cerr << "Failed to open camera!" << endl;
-        return;
+	cerr << "Failed to open camera!" << endl;
+	return;
     }
 
     Mat frame;
+    int FramerCounter = 0;
+    clock_t StartTime,EndTime;
 
     while(!cap_quit) {
-        cam.read(frame);
-        cap_time_queue.push(clock());
-        frame_queue.push(frame);
+	cam.read(frame);
+	cap_time_queue.push(clock());
+	frame_queue.push(frame);
+
+        if(FramerCounter==0) 
+            StartTime=clock();
+
+        FramerCounter++;
+        EndTime=clock();
+        if((EndTime-StartTime)/CLOCKS_PER_SEC>=1){
+            cout << "\rFPS: " << FramerCounter << flush;
+            FramerCounter=0;
+        }
     }
 
     cam.release();
@@ -72,27 +85,27 @@ void video_cap_thread(void) {
 /* Uart thread */
 void uart_thread(void) {
     if(uart_init() != EXIT_SUCCESS) {
-        cerr << "Failed to initialize uart\n";
-        return;
+	cerr << "Failed to initialize uart\n";
+	return;
     }
 
     float seq[] = {0, 90, 180};
 
     size_t i;
-    while(true) {
-        for(i = 0; i < 3; i++) {
-            uart_write(&seq[i], sizeof(float));
-            sleep(5);
-        }
+    while(!uart_quit) {
+	for(i = 0; i < 3; i++) {
+	    uart_write(&seq[i], sizeof(float));
+	    sleep(5);
+	}
     }
 
     uart_release();
 }
 
-static inline void write_data(ofstream &file, Point2f cen, Point2f v) {
-    file << 640 - cen.x << ",";
-    file << 480 - cen.y << ",";
-    file << v << endl;
+static inline void write_data(Point2f cen, Point2f v) {
+    cout << 640 - cen.x << ",";
+    cout << 480 - cen.y << ",";
+    cout << v << endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -102,7 +115,7 @@ int main(int argc, char* argv[]) {
     ofstream circle_data;
 
     circle_data.open("circle_data.txt");
-    circle_data << "X, Y, Vel\n";
+    circle_data << "X, Y\n";
 
     int canny_param = CANNY_DEFAULT;
 
@@ -143,62 +156,69 @@ int main(int argc, char* argv[]) {
 
     size_t largest_contour;
     while(true) {
-        if(frame_queue.empty()) {
-            continue;
-        }
+	if(frame_queue.empty()) {
+	    continue;
+	}
 
-        cvtColor(frame_queue.front(), hsv, CV_BGR2HSV);
-
-#ifdef GUI_DEMO
-        hsv_hue_lim = Scalar(hsv_hue_lo, hsv_hue_hi);
-        hsv_sat_lim = Scalar(hsv_sat_lo, hsv_sat_hi);
-        hsv_val_lim = Scalar(hsv_val_lo, hsv_val_hi);
-#endif
-
-        hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
-        detect_circles(thres, circles, canny_param);
-
-        if(circles.size()) {
-            centroids = vector<Point2f>(circles.size());
-            calc_centroids(centroids, circles);
-
-            largest_contour = 0;
-            for(size_t i = 0; i < circles.size(); i++) {
-                if(arcLength(circles[largest_contour], true) < arcLength(circles[i], true)) {
-                    largest_contour = i;
-                }
-            }
+	cvtColor(frame_queue.front(), hsv, CV_BGR2HSV);
 
 #ifdef GUI_DEMO
-            //drawContours(frame_queue.front(), circles, largest_contour, 
-            //        CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
-            circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+	hsv_hue_lim = Scalar(hsv_hue_lo, hsv_hue_hi);
+	hsv_sat_lim = Scalar(hsv_sat_lo, hsv_sat_hi);
+	hsv_val_lim = Scalar(hsv_val_lo, hsv_val_hi);
 #endif
 
-            write_data(circle_data, centroids[largest_contour], 
-                    velocity(Point2f(640,480) - centroids[largest_contour], cap_time_queue.front(), Point2f(640, 480) - prev_centroid, prev_time));
+	hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
+	detect_circles(thres, circles, canny_param);
 
-            prev_centroid = centroids[largest_contour];
-            prev_time = cap_time_queue.front();
-        }
+	if(circles.size()) {
+	    centroids = vector<Point2f>(circles.size());
+	    calc_centroids(centroids, circles);
+
+	    largest_contour = 0;
+	    for(size_t i = 0; i < circles.size(); i++) {
+		if(arcLength(circles[largest_contour], true) < arcLength(circles[i], true)) {
+		    largest_contour = i;
+		}
+	    }
+
+#ifdef GUI_DEMO
+	    //drawContours(frame_queue.front(), circles, largest_contour, 
+	    //        CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
+	    circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+#endif
+
+#if 0
+	    write_data(circle_data, centroids[largest_contour], 
+		    velocity(Point2f(640,480) - centroids[largest_contour], cap_time_queue.front(), Point2f(640, 480) - prev_centroid, prev_time));
+
+	    write_data(centroids[largest_contour], velocity(Point2f(640,480) - centroids[largest_contour], cap_time_queue.front(), Point2f(640, 480) - prev_centroid, prev_time));
+	    prev_centroid = centroids[largest_contour];
+	    prev_time = cap_time_queue.front();
+#endif
+	}
 
 
 #ifdef GUI_DEMO
-        imshow("Tracking", frame_queue.front());
-        imshow("Thresholding", thres);
+	imshow("Tracking", frame_queue.front());
+	imshow("Thresholding", thres);
 #endif
-        if(waitKey(1) > 0) {
-            break;
-        }
-    
-        frame_queue.pop();
-        cap_time_queue.pop();
+	if(waitKey(1) > 0) {
+	    break;
+	}
+
+	frame_queue.pop();
+	cap_time_queue.pop();
     }
 
     cap_quit = true;
+    uart_quit = true;
+
     queue<Mat>().swap(frame_queue);
     queue<clock_t>().swap(cap_time_queue);
+#ifdef GUI_DEMO
     destroyAllWindows();
+#endif
     circle_data.close();
 
     return EXIT_SUCCESS;
