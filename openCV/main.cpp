@@ -2,6 +2,7 @@
 #include <fstream>
 #include <ctime>
 #include <thread>
+#include <mutex>
 #include <queue>
 
 #include <opencv2/opencv.hpp>
@@ -22,11 +23,7 @@
 #define CIRCLE_THICKNESS 3
 #define CIRCLE_LINE_TYPE 8
 
-#define DELTA(curr, prev) \
-    (curr - prev)
-
-#define VELOCITY(curr, prev) \
-    (DELTA(curr.y, prev.y) / DELTA(curr.x, prev.x))
+#define CLOCKS_PER_MSEC ((double)CLOCKS_PER_SEC / 1000)
 
 using namespace std;
 using namespace cv;
@@ -37,13 +34,17 @@ Scalar hsv_hue_lim = HUE_LIM_DEFAULT;
 Scalar hsv_sat_lim = SAT_LIM_DEFAULT;
 Scalar hsv_val_lim = VAL_LIM_DEFAULT;
 
+mutex uart_mtx;
+float uart_state[4];
+
 queue<Mat> frame_queue;
 queue<clock_t> cap_time_queue;
 bool cap_quit = false;
 bool uart_quit = false;
 
 static Point2f velocity(Point2f curr, clock_t curr_time, Point2f prev, clock_t prev_time) {
-    double delta_t = (curr_time - prev_time);
+    double delta_t = (curr_time - prev_time) / CLOCKS_PER_MSEC;
+    cout << "Delta T " << delta_t << endl;;
     float v_x = (curr.x - prev.x) / delta_t;
     float v_y = (curr.y - prev.y) / delta_t;
 
@@ -74,7 +75,7 @@ void video_cap_thread(void) {
         FramerCounter++;
         EndTime=clock();
         if((EndTime-StartTime)/CLOCKS_PER_SEC>=1){
-            cout << "\rFPS: " << FramerCounter << flush;
+            //cout << "\rFPS: " << FramerCounter << flush;
             FramerCounter=0;
         }
     }
@@ -89,33 +90,32 @@ void uart_thread(void) {
 	return;
     }
 
-    float seq[] = {0, 90, 180};
+    float state[4];
 
-    size_t i;
+    size_t i = 0;
     while(!uart_quit) {
-	for(i = 0; i < 3; i++) {
-	    uart_write(&seq[i], sizeof(float));
-	    sleep(5);
-	}
+        uart_mtx.lock();
+        memcpy(state, uart_state, 4*sizeof(float));
+        uart_mtx.unlock();
+
+        for(i = 0; i < 4; i++) {
+            uart_write(&state[i], sizeof(float));
+            delay(3);
+        }
+    }
+
+    memset(state, 0, 4*sizeof(float));
+    for(i = 0; i < 4; i++) {
+        uart_write(&state[i], sizeof(float));
+        delay(3);
     }
 
     uart_release();
 }
 
-static inline void write_data(Point2f cen, Point2f v) {
-    cout << 640 - cen.x << ",";
-    cout << 480 - cen.y << ",";
-    cout << v << endl;
-}
-
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
-
-    ofstream circle_data;
-
-    circle_data.open("circle_data.txt");
-    circle_data << "X, Y\n";
 
     int canny_param = CANNY_DEFAULT;
 
@@ -147,6 +147,7 @@ int main(int argc, char* argv[]) {
     Mat thres;
     vector<vector<Point>> circles;
     vector<Point2f> centroids;
+    Point2f vel(0, 0);
     Point2f prev_centroid(0, 0);
     clock_t prev_time = 0;
 
@@ -183,29 +184,33 @@ int main(int argc, char* argv[]) {
 	    }
 
 #ifdef GUI_DEMO
-	    //drawContours(frame_queue.front(), circles, largest_contour, 
-	    //        CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
-	    circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+	    drawContours(frame_queue.front(), circles, largest_contour, CIRCLE_COLOR_RGB, 
+                    CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
+	    circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, 
+                    CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+
+	    imshow("Tracking", frame_queue.front());
+	    imshow("Thresholding", thres);
+	    if(waitKey(1) > 0) {
+	        break;
+	    }
 #endif
 
-#if 0
-	    write_data(circle_data, centroids[largest_contour], 
-		    velocity(Point2f(640,480) - centroids[largest_contour], cap_time_queue.front(), Point2f(640, 480) - prev_centroid, prev_time));
+            vel = velocity(Point2f(640, 480) - centroids[largest_contour], cap_time_queue.front(),
+                    prev_centroid, prev_time);
 
-	    write_data(centroids[largest_contour], velocity(Point2f(640,480) - centroids[largest_contour], cap_time_queue.front(), Point2f(640, 480) - prev_centroid, prev_time));
-	    prev_centroid = centroids[largest_contour];
-	    prev_time = cap_time_queue.front();
-#endif
-	}
+            cout << "Velocity " << vel << endl;
 
+            uart_mtx.lock();
+            uart_state[0] = 640 - centroids[largest_contour].x;
+            uart_state[1] = 480 - centroids[largest_contour].y;
+            uart_state[2] = vel.x;
+            uart_state[3] = vel.y;
+            uart_mtx.unlock();
 
-#ifdef GUI_DEMO
-	imshow("Tracking", frame_queue.front());
-	imshow("Thresholding", thres);
-#endif
-	if(waitKey(1) > 0) {
-	    break;
-	}
+            prev_centroid = centroids[largest_contour];
+            prev_time = cap_time_queue.front();
+        }
 
 	frame_queue.pop();
 	cap_time_queue.pop();
@@ -219,7 +224,6 @@ int main(int argc, char* argv[]) {
 #ifdef GUI_DEMO
     destroyAllWindows();
 #endif
-    circle_data.close();
 
     return EXIT_SUCCESS;
 }
