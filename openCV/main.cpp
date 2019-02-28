@@ -15,7 +15,7 @@
 #define CANNY_DEFAULT 60
 
 #define HUE_LIM_DEFAULT Scalar(0, 60)
-#define SAT_LIM_DEFAULT Scalar(100, 255)
+#define SAT_LIM_DEFAULT Scalar(150, 255)
 #define VAL_LIM_DEFAULT Scalar(200, 255)
 
 #define CIRCLE_COLOR_RGB (Scalar(255, 0, 255))
@@ -38,7 +38,16 @@ Scalar hsv_sat_lim = SAT_LIM_DEFAULT;
 Scalar hsv_val_lim = VAL_LIM_DEFAULT;
 
 queue<Mat> frame_queue;
+queue<clock_t> cap_time_queue;
 bool cap_quit = false;
+
+static Point2f velocity(Point2f curr, clock_t curr_time, Point2f prev, clock_t prev_time) {
+    double delta_t = (curr_time - prev_time);
+    float v_x = (curr.x - prev.x) / delta_t;
+    float v_y = (curr.y - prev.y) / delta_t;
+
+    return Point2f(v_x, v_y);
+}
 
 /* Video capture thread */
 void video_cap_thread(void) {
@@ -53,6 +62,7 @@ void video_cap_thread(void) {
 
     while(!cap_quit) {
         cam.read(frame);
+        cap_time_queue.push(clock());
         frame_queue.push(frame);
     }
 
@@ -79,6 +89,12 @@ void uart_thread(void) {
     uart_release();
 }
 
+static inline void write_data(ofstream &file, Point2f cen, Point2f v) {
+    file << 640 - cen.x << ",";
+    file << 480 - cen.y << ",";
+    file << v << endl;
+}
+
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
@@ -88,11 +104,12 @@ int main(int argc, char* argv[]) {
     circle_data.open("circle_data.txt");
     circle_data << "X, Y, Vel\n";
 
-    namedWindow("Thresh Params", CV_WINDOW_AUTOSIZE);
+    int canny_param = CANNY_DEFAULT;
 
 #ifdef GUI_DEMO
     namedWindow("Tracking", CV_WINDOW_AUTOSIZE);
     namedWindow("Thresholding", CV_WINDOW_AUTOSIZE);
+    namedWindow("Thresh Params", CV_WINDOW_AUTOSIZE);
 
     int hsv_hue_hi = HUE_LIM_DEFAULT[1];
     int hsv_hue_lo = HUE_LIM_DEFAULT[0];
@@ -107,11 +124,8 @@ int main(int argc, char* argv[]) {
     createTrackbar("Sat Lo", "Thresh Params", &hsv_sat_lo, 255, NULL, NULL);
     createTrackbar("Val Hi", "Thresh Params", &hsv_val_hi, 255, NULL, NULL);
     createTrackbar("Val Lo", "Thresh Params", &hsv_val_lo, 255, NULL, NULL);
-
-#endif
-
-    int canny_param = CANNY_DEFAULT;
     createTrackbar("Canny Thres", "Thresh Params", &canny_param, 255, NULL, NULL);
+#endif
 
     thread video_capture(video_cap_thread);
     thread uart_send(uart_thread);
@@ -120,7 +134,8 @@ int main(int argc, char* argv[]) {
     Mat thres;
     vector<vector<Point>> circles;
     vector<Point2f> centroids;
-    Point2f prev(0, 0);
+    Point2f prev_centroid(0, 0);
+    clock_t prev_time = 0;
 
 #ifdef GUI_DEMO
     cout << "Press any key to exit..." << endl;
@@ -139,6 +154,7 @@ int main(int argc, char* argv[]) {
         hsv_sat_lim = Scalar(hsv_sat_lo, hsv_sat_hi);
         hsv_val_lim = Scalar(hsv_val_lo, hsv_val_hi);
 #endif
+
         hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
         detect_circles(thres, circles, canny_param);
 
@@ -153,31 +169,35 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            drawContours(frame_queue.front(), circles, largest_contour, 
-                    CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
-            //circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+#ifdef GUI_DEMO
+            //drawContours(frame_queue.front(), circles, largest_contour, 
+            //        CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
+            circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+#endif
 
-            circle_data << centroids[largest_contour].x << ",";
-            circle_data << centroids[largest_contour].y << ",";
-            circle_data << VELOCITY(centroids[largest_contour], prev) << endl;
+            write_data(circle_data, centroids[largest_contour], 
+                    velocity(Point2f(640,480) - centroids[largest_contour], cap_time_queue.front(), Point2f(640, 480) - prev_centroid, prev_time));
 
-            prev = centroids[largest_contour];
+            prev_centroid = centroids[largest_contour];
+            prev_time = cap_time_queue.front();
         }
 
 
 #ifdef GUI_DEMO
         imshow("Tracking", frame_queue.front());
         imshow("Thresholding", thres);
+#endif
         if(waitKey(1) > 0) {
             break;
         }
-#endif
     
         frame_queue.pop();
+        cap_time_queue.pop();
     }
 
     cap_quit = true;
     queue<Mat>().swap(frame_queue);
+    queue<clock_t>().swap(cap_time_queue);
     destroyAllWindows();
     circle_data.close();
 
