@@ -122,6 +122,7 @@ void uart_thread(void) {
         uart_mtx.unlock();
 
         for(i = 0; i < 4; i++) {
+            cout << "Uart Writing " << state << endl;
             uart_write(&state[i], sizeof(float));
             delay(3);
         }
@@ -240,8 +241,6 @@ int main(int argc, char* argv[]) {
             update_N_velocity(Point(0,0), clock(), N_centroids, N_vel, N_time);
             vel = avg_N_vel(N_vel);
         }
-
-        cout << "Avg N Velocity " << vel << endl;
 
 	frame_queue.pop();
 	cap_time_queue.pop();
