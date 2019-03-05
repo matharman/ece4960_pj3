@@ -42,26 +42,15 @@ queue<clock_t> cap_time_queue;
 bool cap_quit = false;
 bool uart_quit = false;
 
-#if 0
-static Point2f velocity(Point2f curr, clock_t curr_time, Point2f prev, clock_t prev_time) {
-    double delta_t = (curr_time - prev_time) / CLOCKS_PER_MSEC;
-    cout << "Delta T " << delta_t << endl;;
-    float v_x = (curr.x - prev.x) / delta_t;
-    float v_y = (curr.y - prev.y) / delta_t;
-
-    return Point2f(v_x, v_y);
-}
-#endif
-
 static void update_N_velocity(Point2f curr_pos, clock_t curr_time, Point2f N_pos[], Point2f N_vel[], clock_t N_time[]) {
+    /* Calculate current instantaneous velocity */
     double delta_t = (curr_time - N_time[N_FRAME_COUNT - 1]) / CLOCKS_PER_MSEC;
-    cout << "Delta T " << delta_t << endl;;
 
     float v_x = (curr_pos.x - N_pos[N_FRAME_COUNT].x) / delta_t;
     float v_y = (curr_pos.y - N_pos[N_FRAME_COUNT].y) / delta_t;
     Point2f curr_vel = Point2f(v_x, v_y);
 
-    /* Shift oldest N_* out */
+    /* Shift oldest N out */
     for(size_t i = 0; i < N_FRAME_COUNT - 1; i++) {
         N_pos[i] = N_pos[i + 1];
         N_vel[i] = N_vel[i + 1];
@@ -182,8 +171,8 @@ int main(int argc, char* argv[]) {
     vector<vector<Point>> circles;
     vector<Point2f> centroids;
     Point2f vel(0, 0);
-    Point2f prev_centroid(0, 0);
-    clock_t prev_time = 0;
+    //Point2f prev_centroid(0, 0);
+    //clock_t prev_time = 0;
 
     Point2f N_vel[N_FRAME_COUNT] = { Point2f(0, 0) };
     Point2f N_centroids[N_FRAME_COUNT] = { Point2f(0, 0) };
@@ -244,11 +233,11 @@ int main(int argc, char* argv[]) {
             uart_state[3] = vel.y;
             uart_mtx.unlock();
 
-            prev_centroid = centroids[largest_contour];
-            prev_time = cap_time_queue.front();
+            //prev_centroid = centroids[largest_contour];
+            //prev_time = cap_time_queue.front();
         }
         else {
-            update_N_velocity(prev_centroid, clock(), N_centroids, N_vel, N_time);
+            update_N_velocity(Point(0,0), clock(), N_centroids, N_vel, N_time);
             vel = avg_N_vel(N_vel);
         }
 
