@@ -1,4 +1,5 @@
 #include <iostream>
+#include <csignal>
 #include <fstream>
 #include <ctime>
 #include <thread>
@@ -39,6 +40,7 @@ float uart_state[4];
 
 queue<Mat> frame_queue;
 queue<clock_t> cap_time_queue;
+bool main_quit = false;
 bool cap_quit = false;
 bool uart_quit = false;
 
@@ -137,9 +139,15 @@ void uart_thread(void) {
     uart_release();
 }
 
+void handle_sigint(int signum) {
+    main_quit = true;
+}
+
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
+
+    signal(SIGINT, handle_sigint);
 
     int canny_param = CANNY_DEFAULT;
 
@@ -184,7 +192,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     size_t largest_contour;
-    while(true) {
+    while(!main_quit) {
 	if(frame_queue.empty()) {
 	    continue;
 	}
