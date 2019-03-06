@@ -38,6 +38,9 @@ Scalar hsv_val_lim = VAL_LIM_DEFAULT;
 mutex uart_mtx;
 float uart_state[4];
 
+thread uart_send;
+thread video_capture;
+
 queue<Mat> frame_queue;
 queue<clock_t> cap_time_queue;
 bool main_quit = false;
@@ -115,7 +118,7 @@ void uart_thread(void) {
 	return;
     }
 
-    float state[4];
+    float state[4] = {0};
 
     size_t i = 0;
     while(!uart_quit) {
@@ -124,7 +127,7 @@ void uart_thread(void) {
         uart_mtx.unlock();
 
         for(i = 0; i < 4; i++) {
-            cout << "Uart Writing " << state << endl;
+            //cout << "Uart Writing " << state[i] << endl;
             uart_write(&state[i], sizeof(float));
             delay(3);
         }
@@ -140,7 +143,18 @@ void uart_thread(void) {
 }
 
 void handle_sigint(int signum) {
-    main_quit = true;
+    if(signum == SIGINT) {
+        cap_quit = true;
+        uart_quit = true;
+        
+        uart_send.join();
+        video_capture.join();
+
+        queue<Mat>().swap(frame_queue);
+        queue<clock_t>().swap(cap_time_queue);
+
+        exit(0);
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -172,8 +186,8 @@ int main(int argc, char* argv[]) {
     createTrackbar("Canny Thres", "Thresh Params", &canny_param, 255, NULL, NULL);
 #endif
 
-    thread video_capture(video_cap_thread);
-    thread uart_send(uart_thread);
+    video_capture = thread(video_cap_thread);
+    uart_send = thread(uart_thread);
 
     Mat hsv;
     Mat thres;
@@ -192,7 +206,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     size_t largest_contour;
-    while(!main_quit) {
+    while(true) {
 	if(frame_queue.empty()) {
 	    continue;
 	}
@@ -250,16 +264,21 @@ int main(int argc, char* argv[]) {
             vel = avg_N_vel(N_vel);
         }
 
+        cout << "Avg N Vel " << vel << endl;
+
 	frame_queue.pop();
 	cap_time_queue.pop();
     }
 
+#ifdef GUI_DEMO
     cap_quit = true;
     uart_quit = true;
+    
+    uart_send.join();
+    video_capture.join();
 
     queue<Mat>().swap(frame_queue);
     queue<clock_t>().swap(cap_time_queue);
-#ifdef GUI_DEMO
     destroyAllWindows();
 #endif
 
