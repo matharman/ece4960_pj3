@@ -2,7 +2,7 @@
 
 #include "include/uart.h"
 
-#define UART_DEVICE "/dev/ttyAMA0"
+#define UART_DEVICE "/dev/ttyS0"
 #define UART_BAUD 9600
 
 using namespace std;
@@ -37,7 +37,6 @@ int Uart::uart_write(void *data, size_t len) {
 
     for(size_t i = 0; i < len; i++) {
         serialPutchar(uart_port, bytes[i]);
-        delay(3);
     }
 
     return EXIT_SUCCESS;

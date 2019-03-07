@@ -120,21 +120,20 @@ void uart_thread(void) {
 
     float state[4] = {10, 10, 10, 10};
 
-    size_t i = 0;
     while(!uart_quit) {
-        //uart_mtx.lock();
-        //memcpy(state, uart_state, 4*sizeof(float));
-        //uart_mtx.unlock();
+        uart_mtx.lock();
+        memcpy(state, uart_state, 4*sizeof(float));
+        uart_mtx.unlock();
 
         //cout << "Uart Writing " << state[i] << endl;
         uart_write(state, 4*sizeof(float));
+        sleep(1);
     }
 
-    //memset(state, 0, 4*sizeof(float));
-    //for(i = 0; i < 4; i++) {
-    //    uart_write(&state[i], sizeof(float));
-    //    delay(3);
-    //}
+    memset(state, 0, 4*sizeof(float));
+    for(size_t i = 0; i < 4; i++) {
+        uart_write(&state[i], sizeof(float));
+    }
 
     uart_release();
 }
@@ -235,19 +234,13 @@ int main(int argc, char* argv[]) {
                     CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
 	    circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, 
                     CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
-
-	    imshow("Tracking", frame_queue.front());
-	    imshow("Thresholding", thres);
-	    if(waitKey(1) > 0) {
-	        break;
-	    }
 #endif
 
             update_N_velocity(centroids[largest_contour], cap_time_queue.front(), N_centroids, N_vel, N_time);
             vel = avg_N_vel(N_vel);
 
             uart_mtx.lock();
-            uart_state[0] = 640 - centroids[largest_contour].x;
+            uart_state[0] = centroids[largest_contour].x - 320;
             uart_state[1] = 480 - centroids[largest_contour].y;
             uart_state[2] = vel.x;
             uart_state[3] = vel.y;
@@ -262,6 +255,15 @@ int main(int argc, char* argv[]) {
         }
 
         //cout << "Avg N Vel " << vel << endl;
+#ifdef GUI_DEMO
+        circle(frame_queue.front(), Point2f(0,0), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+        circle(frame_queue.front(), Point2f(640 / 2,480), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+	imshow("Tracking", frame_queue.front());
+	imshow("Thresholding", thres);
+	if(waitKey(1) > 0) {
+	        break;
+	}
+#endif
 
 	frame_queue.pop();
 	cap_time_queue.pop();
