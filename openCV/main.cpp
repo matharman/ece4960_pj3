@@ -118,26 +118,23 @@ void uart_thread(void) {
 	return;
     }
 
-    float state[4] = {0};
+    float state[4] = {10, 10, 10, 10};
 
     size_t i = 0;
     while(!uart_quit) {
-        uart_mtx.lock();
-        memcpy(state, uart_state, 4*sizeof(float));
-        uart_mtx.unlock();
+        //uart_mtx.lock();
+        //memcpy(state, uart_state, 4*sizeof(float));
+        //uart_mtx.unlock();
 
-        for(i = 0; i < 4; i++) {
-            //cout << "Uart Writing " << state[i] << endl;
-            uart_write(&state[i], sizeof(float));
-            delay(3);
-        }
+        //cout << "Uart Writing " << state[i] << endl;
+        uart_write(state, 4*sizeof(float));
     }
 
-    memset(state, 0, 4*sizeof(float));
-    for(i = 0; i < 4; i++) {
-        uart_write(&state[i], sizeof(float));
-        delay(3);
-    }
+    //memset(state, 0, 4*sizeof(float));
+    //for(i = 0; i < 4; i++) {
+    //    uart_write(&state[i], sizeof(float));
+    //    delay(3);
+    //}
 
     uart_release();
 }
@@ -264,7 +261,7 @@ int main(int argc, char* argv[]) {
             vel = avg_N_vel(N_vel);
         }
 
-        cout << "Avg N Vel " << vel << endl;
+        //cout << "Avg N Vel " << vel << endl;
 
 	frame_queue.pop();
 	cap_time_queue.pop();

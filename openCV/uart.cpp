@@ -2,7 +2,7 @@
 
 #include "include/uart.h"
 
-#define UART_DEVICE "/dev/ttyS0"
+#define UART_DEVICE "/dev/ttyAMA0"
 #define UART_BAUD 9600
 
 using namespace std;
