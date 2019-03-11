@@ -1,6 +1,5 @@
 #include <iostream>
 #include <csignal>
-#include <fstream>
 #include <ctime>
 #include <thread>
 #include <mutex>
@@ -24,7 +23,7 @@
 #define CIRCLE_THICKNESS 3
 #define CIRCLE_LINE_TYPE 8
 
-#define CLOCKS_PER_MSEC ((double)CLOCKS_PER_SEC / 1000)
+#define CLOCKS_PER_MSEC ((float)CLOCKS_PER_SEC / 1000)
 
 using namespace std;
 using namespace cv;
@@ -49,10 +48,17 @@ bool uart_quit = false;
 
 static void update_N_velocity(Point2f curr_pos, clock_t curr_time, Point2f N_pos[], Point2f N_vel[], clock_t N_time[]) {
     /* Calculate current instantaneous velocity */
-    double delta_t = (curr_time - N_time[N_FRAME_COUNT - 1]) / CLOCKS_PER_MSEC;
+    float delta_t = (curr_time - N_time[N_FRAME_COUNT - 1]) / (float)CLOCKS_PER_SEC;
 
-    float v_x = (curr_pos.x - N_pos[N_FRAME_COUNT].x) / delta_t;
-    float v_y = (curr_pos.y - N_pos[N_FRAME_COUNT].y) / delta_t;
+    float v_x = ((curr_pos.x - 320.0) - N_pos[N_FRAME_COUNT - 1].x);
+    float v_y = ((480 - curr_pos.y) - N_pos[N_FRAME_COUNT - 1].y);
+
+    v_x /= delta_t;
+    v_y /= delta_t;
+
+    v_x = (isnan(v_x)) ? 0.0 : v_x;
+    v_y = (isnan(v_y)) ? 0.0 : v_y;
+
     Point2f curr_vel = Point2f(v_x, v_y);
 
     /* Shift oldest N out */
@@ -62,7 +68,13 @@ static void update_N_velocity(Point2f curr_pos, clock_t curr_time, Point2f N_pos
         N_time[i] = N_time[i + 1];
     }
 
-    N_pos[N_FRAME_COUNT - 1] = curr_pos;
+    if(!isnan(curr_pos.x) && !isnan(curr_pos.y)) {
+        N_pos[N_FRAME_COUNT - 1] = Point2f(curr_pos.x - 320, 480 - curr_pos.y);
+    }
+    else {
+        N_pos[N_FRAME_COUNT - 1] = Point2f(320, 480);
+    }
+
     N_vel[N_FRAME_COUNT - 1] = curr_vel;
     N_time[N_FRAME_COUNT - 1] = curr_time;
 }
@@ -71,12 +83,17 @@ static Point2f avg_N_vel(Point2f N_vel[]) {
     float avg_v_x = 0;
     float avg_v_y = 0;
 
+#if 1
     for(size_t i = 0; i < N_FRAME_COUNT; i++) {
         avg_v_x += N_vel[i].x;
         avg_v_y += N_vel[i].y;
     }
+#endif
 
-    return Point2f(avg_v_x / N_FRAME_COUNT, avg_v_y / N_FRAME_COUNT);
+    avg_v_x /= N_FRAME_COUNT;
+    avg_v_y /= N_FRAME_COUNT;
+
+    return Point2f(avg_v_x, avg_v_y);
 }
 
 /* Video capture thread */
@@ -125,9 +142,8 @@ void uart_thread(void) {
         memcpy(state, uart_state, 4*sizeof(float));
         uart_mtx.unlock();
 
-        //cout << "Uart Writing " << state[i] << endl;
         uart_write(state, 4*sizeof(float));
-        sleep(1);
+        usleep(1000);
     }
 
     memset(state, 0, 4*sizeof(float));
@@ -229,6 +245,9 @@ int main(int argc, char* argv[]) {
 		}
 	    }
 
+            update_N_velocity(centroids[largest_contour], cap_time_queue.front(), N_centroids, N_vel, N_time);
+            vel = avg_N_vel(N_vel);
+
 #ifdef GUI_DEMO
 	    drawContours(frame_queue.front(), circles, largest_contour, CIRCLE_COLOR_RGB, 
                     CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
@@ -236,25 +255,25 @@ int main(int argc, char* argv[]) {
                     CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
 #endif
 
-            update_N_velocity(centroids[largest_contour], cap_time_queue.front(), N_centroids, N_vel, N_time);
-            vel = avg_N_vel(N_vel);
-
-            uart_mtx.lock();
-            uart_state[0] = centroids[largest_contour].x - 320;
-            uart_state[1] = 480 - centroids[largest_contour].y;
-            uart_state[2] = vel.x;
-            uart_state[3] = vel.y;
-            uart_mtx.unlock();
-
             //prev_centroid = centroids[largest_contour];
             //prev_time = cap_time_queue.front();
         }
         else {
-            update_N_velocity(Point(0,0), clock(), N_centroids, N_vel, N_time);
+            update_N_velocity(Point2f(320, 480), cap_time_queue.front(), N_centroids, N_vel, N_time);
             vel = avg_N_vel(N_vel);
         }
 
-        //cout << "Avg N Vel " << vel << endl;
+        uart_mtx.lock();
+        uart_state[0] = N_centroids[N_FRAME_COUNT - 1].x;
+        uart_state[1] = N_centroids[N_FRAME_COUNT - 1].y;
+        uart_state[2] = vel.x;
+        uart_state[3] = vel.y;
+
+        cout << uart_state[0] << " " << uart_state[1] << " ";
+        cout << uart_state[2] << " " << uart_state[3] << endl;
+
+        uart_mtx.unlock();
+
 #ifdef GUI_DEMO
         circle(frame_queue.front(), Point2f(0,0), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
         circle(frame_queue.front(), Point2f(640 / 2,480), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
