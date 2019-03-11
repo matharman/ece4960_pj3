@@ -3,7 +3,7 @@
 #include "include/uart.h"
 
 #define UART_DEVICE "/dev/ttyS0"
-#define UART_BAUD 9600
+#define UART_BAUD 115200
 
 using namespace std;
 
