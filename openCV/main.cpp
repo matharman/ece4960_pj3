@@ -118,7 +118,7 @@ void uart_thread(void) {
 	return;
     }
 
-    float state[4] = {10, 10, 10, 10};
+    float state[4] = {0, 0, 0, 0};
 
     while(!uart_quit) {
         uart_mtx.lock();
