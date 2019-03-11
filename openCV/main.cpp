@@ -46,6 +46,7 @@ bool main_quit = false;
 bool cap_quit = false;
 bool uart_quit = false;
 
+#if 0
 static void update_N_velocity(Point2f curr_pos, clock_t curr_time, Point2f N_pos[], Point2f N_vel[], clock_t N_time[]) {
     /* Calculate current instantaneous velocity */
     float delta_t = (curr_time - N_time[N_FRAME_COUNT - 1]) / (float)CLOCKS_PER_SEC;
@@ -95,10 +96,29 @@ static Point2f avg_N_vel(Point2f N_vel[]) {
 
     return Point2f(avg_v_x, avg_v_y);
 }
+#endif
+
+static Point2f reg_param(Point2f pos[]) {
+    float sum_x = 0.0;
+    float sum_y = 0.0;
+    float sum_xy = 0.0;
+    float sum_x_sqrd = 0.0;
+
+    for(size_t i = 0; i < N_FRAME_COUNT; i++) {
+        sum_x += pos[i].x;
+        sum_y += pos[i].y;
+        sum_xy += pos[i].x * pos[i].y;
+        sum_x_sqrd += (pos[i].x * pos[i].x);
+    }
+
+    float reg_m = (N_FRAME_COUNT * sum_xy - sum_x * sum_y) / (N_FRAME_COUNT * sum_x_sqrd - sum_x * sum_x);
+    float reg_b = (sum_y - m * sum_x) / N_FRAME_COUNT;
+
+    return Point2f(reg_m, reg_b);
+}
 
 /* Video capture thread */
 void video_cap_thread(void) {
-
     VideoCapture cam(0);
     if(!cam.isOpened()) {
 	cerr << "Failed to open camera!" << endl;
@@ -120,7 +140,7 @@ void video_cap_thread(void) {
         FramerCounter++;
         EndTime=clock();
         if((EndTime-StartTime)/CLOCKS_PER_SEC>=1){
-            //cout << "\rFPS: " << FramerCounter << flush;
+            cout << "\rFPS: " << FramerCounter << flush;
             FramerCounter=0;
         }
     }
@@ -135,7 +155,7 @@ void uart_thread(void) {
 	return;
     }
 
-    float state[4] = {0, 0, 0, 0};
+    float state[] = {0, 0, 0, 0};
 
     while(!uart_quit) {
         uart_mtx.lock();
@@ -206,8 +226,6 @@ int main(int argc, char* argv[]) {
     vector<vector<Point>> circles;
     vector<Point2f> centroids;
     Point2f vel(0, 0);
-    //Point2f prev_centroid(0, 0);
-    //clock_t prev_time = 0;
 
     Point2f N_vel[N_FRAME_COUNT] = { Point2f(0, 0) };
     Point2f N_centroids[N_FRAME_COUNT] = { Point2f(0, 0) };
@@ -254,9 +272,6 @@ int main(int argc, char* argv[]) {
 	    circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, 
                     CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
 #endif
-
-            //prev_centroid = centroids[largest_contour];
-            //prev_time = cap_time_queue.front();
         }
         else {
             update_N_velocity(Point2f(320, 480), cap_time_queue.front(), N_centroids, N_vel, N_time);
@@ -268,10 +283,6 @@ int main(int argc, char* argv[]) {
         uart_state[1] = N_centroids[N_FRAME_COUNT - 1].y;
         uart_state[2] = vel.x;
         uart_state[3] = vel.y;
-
-        cout << uart_state[0] << " " << uart_state[1] << " ";
-        cout << uart_state[2] << " " << uart_state[3] << endl;
-
         uart_mtx.unlock();
 
 #ifdef GUI_DEMO
