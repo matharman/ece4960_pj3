@@ -46,6 +46,7 @@ thread video_capture;
 queue<Mat> frame_queue;
 queue<clock_t> cap_time_queue;
 
+#if 1
 static Point2f reg_param(Point2f pos[], clock_t time[]) {
     float sum_t = 0.0;
     float sum_x = 0.0;
@@ -55,14 +56,14 @@ static Point2f reg_param(Point2f pos[], clock_t time[]) {
     float sum_t_sqr = 0.0;
 
     for(size_t i = 0; i < N_FRAME_COUNT; i++) {
-        sum_t += time[i] / CLOCKS_PER_SEC;
+        sum_t += time[i] / (float)CLOCKS_PER_SEC;
         sum_x += pos[i].x;
         sum_y += pos[i].y;
 
-        sum_tx += (time[i] / CLOCKS_PER_SEC) * pos[i].x;
-        sum_ty += (time[i] / CLOCKS_PER_SEC) * pos[i].y;
+        sum_tx += (time[i] / (float)CLOCKS_PER_SEC) * pos[i].x;
+        sum_ty += (time[i] / (float)CLOCKS_PER_SEC) * pos[i].y; 
 
-        sum_t_sqr += (time[i] / CLOCKS_PER_SEC) * (time[i] / CLOCKS_PER_SEC);
+        sum_t_sqr += (time[i] / (float)CLOCKS_PER_SEC) * (time[i] / (float)CLOCKS_PER_SEC);
     }
 
     float vx = (N_FRAME_COUNT * sum_tx - sum_t * sum_x) / (N_FRAME_COUNT * sum_t_sqr - sum_t * sum_t);
@@ -70,6 +71,7 @@ static Point2f reg_param(Point2f pos[], clock_t time[]) {
 
     return Point2f(vx, vy);
 }
+#endif
 
 static void update_N_params(Point2f curr_pos, clock_t curr_time, Point2f N_pos[], clock_t N_time[]) {
 
@@ -106,7 +108,6 @@ void video_cap_thread(void) {
         EndTime=clock();
         if((EndTime-StartTime)/CLOCKS_PER_SEC>=1){
             //cout << "\rFPS: " << FramerCounter << flush;
-            FramerCounter=0;
         }
     }
 
@@ -243,7 +244,9 @@ int main(int argc, char* argv[]) {
             update_N_params(Point2f(0, 0), cap_time_queue.front(), N_centroids, N_time);
         }
 
-        cout << N_centroids[N_FRAME_COUNT - 1] << vel << endl;
+        cout << "Time: " << N_time[N_FRAME_COUNT - 1] / (float)CLOCKS_PER_SEC << endl;
+        cout << "Pos: " << N_centroids[N_FRAME_COUNT - 1] << endl;
+        cout << "Vel: " << vel << endl << endl << endl;
 
         // FIXME: Uart write a single angle output from the mirror law
         uart_mtx.lock();
