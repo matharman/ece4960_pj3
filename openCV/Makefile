@@ -1,7 +1,6 @@
 CC=g++
 CFLAGS=-Wall -Wextra -Wpedantic -g -DN_FRAME_COUNT=5
 
-#SRC=$(wildcard *.c)
 SRC=$(wildcard *.cpp)
 LIB= -lwiringPi `pkg-config --cflags --libs opencv`
 
