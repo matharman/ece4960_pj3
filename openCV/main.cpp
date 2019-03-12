@@ -37,84 +37,38 @@ Scalar hsv_val_lim = VAL_LIM_DEFAULT;
 mutex uart_mtx;
 float uart_state[4];
 
+bool cap_quit = false;
+bool uart_quit = false;
+
 thread uart_send;
 thread video_capture;
 
 queue<Mat> frame_queue;
 queue<clock_t> cap_time_queue;
-bool main_quit = false;
-bool cap_quit = false;
-bool uart_quit = false;
 
-#if 0
-static void update_N_velocity(Point2f curr_pos, clock_t curr_time, Point2f N_pos[], Point2f N_vel[], clock_t N_time[]) {
-    /* Calculate current instantaneous velocity */
-    float delta_t = (curr_time - N_time[N_FRAME_COUNT - 1]) / (float)CLOCKS_PER_SEC;
-
-    float v_x = ((curr_pos.x - 320.0) - N_pos[N_FRAME_COUNT - 1].x);
-    float v_y = ((480 - curr_pos.y) - N_pos[N_FRAME_COUNT - 1].y);
-
-    v_x /= delta_t;
-    v_y /= delta_t;
-
-    v_x = (isnan(v_x)) ? 0.0 : v_x;
-    v_y = (isnan(v_y)) ? 0.0 : v_y;
-
-    Point2f curr_vel = Point2f(v_x, v_y);
-
-    /* Shift oldest N out */
-    for(size_t i = 0; i < N_FRAME_COUNT - 1; i++) {
-        N_pos[i] = N_pos[i + 1];
-        N_vel[i] = N_vel[i + 1];
-        N_time[i] = N_time[i + 1];
-    }
-
-    if(!isnan(curr_pos.x) && !isnan(curr_pos.y)) {
-        N_pos[N_FRAME_COUNT - 1] = Point2f(curr_pos.x - 320, 480 - curr_pos.y);
-    }
-    else {
-        N_pos[N_FRAME_COUNT - 1] = Point2f(320, 480);
-    }
-
-    N_vel[N_FRAME_COUNT - 1] = curr_vel;
-    N_time[N_FRAME_COUNT - 1] = curr_time;
-}
-
-static Point2f avg_N_vel(Point2f N_vel[]) {
-    float avg_v_x = 0;
-    float avg_v_y = 0;
-
-#if 1
-    for(size_t i = 0; i < N_FRAME_COUNT; i++) {
-        avg_v_x += N_vel[i].x;
-        avg_v_y += N_vel[i].y;
-    }
-#endif
-
-    avg_v_x /= N_FRAME_COUNT;
-    avg_v_y /= N_FRAME_COUNT;
-
-    return Point2f(avg_v_x, avg_v_y);
-}
-#endif
-
-static Point2f reg_param(Point2f pos[]) {
+static Point2f reg_param(Point2f pos[], clock_t time[]) {
+    float sum_t = 0.0;
     float sum_x = 0.0;
     float sum_y = 0.0;
-    float sum_xy = 0.0;
-    float sum_x_sqrd = 0.0;
+    float sum_tx = 0.0;
+    float sum_ty = 0.0;
+    float sum_t_sqr = 0.0;
 
     for(size_t i = 0; i < N_FRAME_COUNT; i++) {
+        sum_t += time[i] / CLOCKS_PER_SEC;
         sum_x += pos[i].x;
         sum_y += pos[i].y;
-        sum_xy += pos[i].x * pos[i].y;
-        sum_x_sqrd += (pos[i].x * pos[i].x);
+
+        sum_tx += (time[i] / CLOCKS_PER_SEC) * pos[i].x;
+        sum_ty += (time[i] / CLOCKS_PER_SEC) * pos[i].y;
+
+        sum_t_sqr += (time[i] / CLOCKS_PER_SEC) * (time[i] / CLOCKS_PER_SEC);
     }
 
-    float reg_m = (N_FRAME_COUNT * sum_xy - sum_x * sum_y) / (N_FRAME_COUNT * sum_x_sqrd - sum_x * sum_x);
-    float reg_b = (sum_y - m * sum_x) / N_FRAME_COUNT;
+    float vx = (N_FRAME_COUNT * sum_tx - sum_t * sum_x) / (N_FRAME_COUNT * sum_t_sqr - sum_t * sum_t);
+    float vy = (N_FRAME_COUNT * sum_ty - sum_t * sum_y) / (N_FRAME_COUNT * sum_t_sqr - sum_t * sum_t);
 
-    return Point2f(reg_m, reg_b);
+    return Point2f(vx, vy);
 }
 
 /* Video capture thread */
@@ -227,7 +181,6 @@ int main(int argc, char* argv[]) {
     vector<Point2f> centroids;
     Point2f vel(0, 0);
 
-    Point2f N_vel[N_FRAME_COUNT] = { Point2f(0, 0) };
     Point2f N_centroids[N_FRAME_COUNT] = { Point2f(0, 0) };
     clock_t N_time[N_FRAME_COUNT] = { 0 };
 
@@ -263,8 +216,8 @@ int main(int argc, char* argv[]) {
 		}
 	    }
 
-            update_N_velocity(centroids[largest_contour], cap_time_queue.front(), N_centroids, N_vel, N_time);
-            vel = avg_N_vel(N_vel);
+            vel = reg_params(N_centroids, N_time);
+            update_N_params(N_centroids, N_time);
 
 #ifdef GUI_DEMO
 	    drawContours(frame_queue.front(), circles, largest_contour, CIRCLE_COLOR_RGB, 
@@ -274,8 +227,8 @@ int main(int argc, char* argv[]) {
 #endif
         }
         else {
-            update_N_velocity(Point2f(320, 480), cap_time_queue.front(), N_centroids, N_vel, N_time);
-            vel = avg_N_vel(N_vel);
+            vel.x = 0;
+            vel.y = 0;
         }
 
         uart_mtx.lock();
