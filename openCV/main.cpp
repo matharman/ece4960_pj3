@@ -71,6 +71,17 @@ static Point2f reg_param(Point2f pos[], clock_t time[]) {
     return Point2f(vx, vy);
 }
 
+static void update_N_params(Point2f curr_pos, clock_t curr_time, Point2f N_pos[], clock_t N_time[]) {
+
+    for(size_t i = 0; i < N_FRAME_COUNT - 1; i++) {
+        N_pos[i] = N_pos[i + 1];
+        N_time[i] = N_time[i + 1];
+    }
+
+    N_pos[N_FRAME_COUNT - 1] = curr_pos;
+    N_time[N_FRAME_COUNT - 1] = curr_time;
+}
+
 /* Video capture thread */
 void video_cap_thread(void) {
     VideoCapture cam(0);
@@ -94,7 +105,7 @@ void video_cap_thread(void) {
         FramerCounter++;
         EndTime=clock();
         if((EndTime-StartTime)/CLOCKS_PER_SEC>=1){
-            cout << "\rFPS: " << FramerCounter << flush;
+            //cout << "\rFPS: " << FramerCounter << flush;
             FramerCounter=0;
         }
     }
@@ -216,8 +227,8 @@ int main(int argc, char* argv[]) {
 		}
 	    }
 
-            vel = reg_params(N_centroids, N_time);
-            update_N_params(N_centroids, N_time);
+            vel = reg_param(N_centroids, N_time);
+            update_N_params(centroids[largest_contour], cap_time_queue.front(), N_centroids, N_time);
 
 #ifdef GUI_DEMO
 	    drawContours(frame_queue.front(), circles, largest_contour, CIRCLE_COLOR_RGB, 
@@ -229,8 +240,12 @@ int main(int argc, char* argv[]) {
         else {
             vel.x = 0;
             vel.y = 0;
+            update_N_params(Point2f(0, 0), cap_time_queue.front(), N_centroids, N_time);
         }
 
+        cout << N_centroids[N_FRAME_COUNT - 1] << vel << endl;
+
+        // FIXME: Uart write a single angle output from the mirror law
         uart_mtx.lock();
         uart_state[0] = N_centroids[N_FRAME_COUNT - 1].x;
         uart_state[1] = N_centroids[N_FRAME_COUNT - 1].y;
