@@ -23,8 +23,6 @@
 #define CIRCLE_THICKNESS 3
 #define CIRCLE_LINE_TYPE 8
 
-#define CLOCKS_PER_MSEC ((float)CLOCKS_PER_SEC / 1000)
-
 using namespace std;
 using namespace cv;
 using namespace Track;
@@ -35,7 +33,7 @@ Scalar hsv_sat_lim = SAT_LIM_DEFAULT;
 Scalar hsv_val_lim = VAL_LIM_DEFAULT;
 
 mutex uart_mtx;
-float uart_state[4];
+int16_t uart_state[4];
 
 bool cap_quit = false;
 bool uart_quit = false;
@@ -47,13 +45,13 @@ queue<Mat> frame_queue;
 queue<clock_t> cap_time_queue;
 
 #if 1
-static Point2f reg_param(Point2f pos[], clock_t time[]) {
-    float sum_t = 0.0;
-    float sum_x = 0.0;
-    float sum_y = 0.0;
-    float sum_tx = 0.0;
-    float sum_ty = 0.0;
-    float sum_t_sqr = 0.0;
+static Point reg_param(Point pos[], clock_t time[]) {
+    int16_t sum_t = 0;
+    int16_t sum_x = 0;
+    int16_t sum_y = 0;
+    int16_t sum_tx = 0;
+    int16_t sum_ty = 0;
+    int16_t sum_t_sqr = 0;
 
     for(size_t i = 0; i < N_FRAME_COUNT; i++) {
         sum_t += time[i] / (float)CLOCKS_PER_SEC;
@@ -66,14 +64,20 @@ static Point2f reg_param(Point2f pos[], clock_t time[]) {
         sum_t_sqr += (time[i] / (float)CLOCKS_PER_SEC) * (time[i] / (float)CLOCKS_PER_SEC);
     }
 
-    float vx = (N_FRAME_COUNT * sum_tx - sum_t * sum_x) / (N_FRAME_COUNT * sum_t_sqr - sum_t * sum_t);
-    float vy = (N_FRAME_COUNT * sum_ty - sum_t * sum_y) / (N_FRAME_COUNT * sum_t_sqr - sum_t * sum_t);
+    int16_t t_denom = (N_FRAME_COUNT * sum_t_sqr - sum_t * sum_t);
+    int16_t vx = 0;
+    int16_t vy = 0;
 
-    return Point2f(vx, vy);
+    if(t_denom) {
+        vx = (N_FRAME_COUNT * sum_tx - sum_t * sum_x) / t_denom;
+        vy = (N_FRAME_COUNT * sum_ty - sum_t * sum_y) / (N_FRAME_COUNT * sum_t_sqr - sum_t * sum_t);
+    }
+
+    return Point(vx, vy);
 }
 #endif
 
-static void update_N_params(Point2f curr_pos, clock_t curr_time, Point2f N_pos[], clock_t N_time[]) {
+static void update_N_params(Point curr_pos, clock_t curr_time, Point N_pos[], clock_t N_time[]) {
 
     for(size_t i = 0; i < N_FRAME_COUNT - 1; i++) {
         N_pos[i] = N_pos[i + 1];
@@ -121,20 +125,20 @@ void uart_thread(void) {
 	return;
     }
 
-    float state[] = {0, 0, 0, 0};
+    int16_t state[] = {0, 0, 0, 0};
 
     while(!uart_quit) {
         uart_mtx.lock();
-        memcpy(state, uart_state, 4*sizeof(float));
+        memcpy(state, uart_state, 4*sizeof(*uart_state));
         uart_mtx.unlock();
 
-        uart_write(state, 4*sizeof(float));
+        uart_write(state, 4*sizeof(*uart_state));
         usleep(1000);
     }
 
-    memset(state, 0, 4*sizeof(float));
+    memset(state, 0, 4*sizeof(*uart_state));
     for(size_t i = 0; i < 4; i++) {
-        uart_write(&state[i], sizeof(float));
+        uart_write(&state[i], sizeof(*uart_state));
     }
 
     uart_release();
@@ -190,10 +194,10 @@ int main(int argc, char* argv[]) {
     Mat hsv;
     Mat thres;
     vector<vector<Point>> circles;
-    vector<Point2f> centroids;
-    Point2f vel(0, 0);
+    vector<Point> centroids;
+    Point vel(0, 0);
 
-    Point2f N_centroids[N_FRAME_COUNT] = { Point2f(0, 0) };
+    Point N_centroids[N_FRAME_COUNT] = { Point(0, 0) };
     clock_t N_time[N_FRAME_COUNT] = { 0 };
 
 #ifdef GUI_DEMO
@@ -218,7 +222,7 @@ int main(int argc, char* argv[]) {
 	detect_circles(thres, circles, canny_param);
 
 	if(circles.size()) {
-	    centroids = vector<Point2f>(circles.size());
+	    centroids = vector<Point>(circles.size());
 	    calc_centroids(centroids, circles);
 
 	    largest_contour = 0;
@@ -241,14 +245,13 @@ int main(int argc, char* argv[]) {
         else {
             vel.x = 0;
             vel.y = 0;
-            update_N_params(Point2f(0, 0), cap_time_queue.front(), N_centroids, N_time);
+            update_N_params(Point(0, 0), cap_time_queue.front(), N_centroids, N_time);
         }
 
         cout << "Time: " << N_time[N_FRAME_COUNT - 1] / (float)CLOCKS_PER_SEC << endl;
         cout << "Pos: " << N_centroids[N_FRAME_COUNT - 1] << endl;
         cout << "Vel: " << vel << endl << endl << endl;
 
-        // FIXME: Uart write a single angle output from the mirror law
         uart_mtx.lock();
         uart_state[0] = N_centroids[N_FRAME_COUNT - 1].x;
         uart_state[1] = N_centroids[N_FRAME_COUNT - 1].y;
@@ -257,8 +260,8 @@ int main(int argc, char* argv[]) {
         uart_mtx.unlock();
 
 #ifdef GUI_DEMO
-        circle(frame_queue.front(), Point2f(0,0), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
-        circle(frame_queue.front(), Point2f(640 / 2,480), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+        circle(frame_queue.front(), Point(0, 0), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+        circle(frame_queue.front(), Point(640 / 2 , 480), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
 	imshow("Tracking", frame_queue.front());
 	imshow("Thresholding", thres);
 	if(waitKey(1) > 0) {

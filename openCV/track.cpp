@@ -29,7 +29,7 @@ void Track::detect_circles(Mat &thres, vector<vector<Point>> &circles, int canny
 }
 
 /* Calculate the centroids of circles */
-void Track::calc_centroids(vector<Point2f> &centroids, vector<vector<Point>> circles) {
+void Track::calc_centroids(vector<Point> &centroids, vector<vector<Point>> circles) {
     vector<Moments> mu(circles.size());
 
     for(size_t i = 0; i < mu.size(); i++) {
@@ -37,6 +37,6 @@ void Track::calc_centroids(vector<Point2f> &centroids, vector<vector<Point>> cir
     }
 
     for(size_t i = 0; i < mu.size(); i++) {
-        centroids[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+        centroids[i] = Point(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
     }
 }

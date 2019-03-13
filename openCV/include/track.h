@@ -20,7 +20,7 @@ namespace Track {
     void detect_circles(cv::Mat &thres, std::vector<std::vector<cv::Point>> &circles, int canny_param);
 
     /* Calculate the centroids of circles in a list of contours */
-    void calc_centroids(std::vector<cv::Point2f> &centroids, std::vector<std::vector<cv::Point>> circles);
+    void calc_centroids(std::vector<cv::Point> &centroids, std::vector<std::vector<cv::Point>> circles);
 }
 
 #endif
