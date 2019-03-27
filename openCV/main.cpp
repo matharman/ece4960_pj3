@@ -6,19 +6,17 @@
 #include <queue>
 
 #include <opencv2/opencv.hpp>
-#include <unistd.h>
-#include <wiringPi.h>
-#include <wiringSerial.h>
-
 #include "include/track.h"
-#include "include/uart.h"
+#include "include/udp.h"
 
 #define CANNY_DEFAULT 60
 
+/* Thresholding parameters */
 #define HUE_LIM_DEFAULT Scalar(0, 60)
 #define SAT_LIM_DEFAULT Scalar(150, 255)
 #define VAL_LIM_DEFAULT Scalar(200, 255)
 
+/* GUI drawing parameters */
 #define CIRCLE_COLOR_RGB (Scalar(255, 0, 255))
 #define CIRCLE_THICKNESS 3
 #define CIRCLE_LINE_TYPE 8
@@ -26,21 +24,28 @@
 using namespace std;
 using namespace cv;
 using namespace Track;
-using namespace Uart;
+using namespace UDP;
 
 Scalar hsv_hue_lim = HUE_LIM_DEFAULT;
 Scalar hsv_sat_lim = SAT_LIM_DEFAULT;
 Scalar hsv_val_lim = VAL_LIM_DEFAULT;
 
-mutex uart_mtx;
-int16_t uart_pos[2];
-float uart_vel;
+#pragma pack(push,1)
+struct packet {
+    int32_t x;
+    int32_t y;
+    float vel;
+};
+#pragma pack(pop)
+
+mutex udp_mtx;
+struct packet vis;
 
 bool cap_quit = false;
-bool uart_quit = false;
+bool udp_quit = false;
 
-thread uart_send;
-thread video_capture;
+thread udp_thread_handle;
+thread video_cap_thread_handle;
 
 queue<Mat> frame_queue;
 queue<clock_t> cap_time_queue;
@@ -73,7 +78,6 @@ static float reg_param(Point pos[], clock_t time[]) {
 #endif
 
 static void update_N_params(Point curr_pos, clock_t curr_time, Point N_pos[], clock_t N_time[]) {
-
     for(size_t i = 0; i < N_FRAME_COUNT - 1; i++) {
         N_pos[i] = N_pos[i + 1];
         N_time[i] = N_time[i + 1];
@@ -87,25 +91,28 @@ static void update_N_params(Point curr_pos, clock_t curr_time, Point N_pos[], cl
 void video_cap_thread(void) {
     VideoCapture cam(0);
     if(!cam.isOpened()) {
-	cerr << "Failed to open camera!" << endl;
-	return;
+        cerr << "Failed to open camera!" << endl;
+        return;
     }
+
+    cam.set(CV_CAP_PROP_FPS, 60.0);
 
     Mat frame;
     int FramerCounter = 0;
     clock_t StartTime,EndTime;
 
     while(!cap_quit) {
-	cam.read(frame);
-	cap_time_queue.push(clock());
-	frame_queue.push(frame);
+        cam.read(frame);
+        cap_time_queue.push(clock());
+        frame_queue.push(frame);
 
-        if(FramerCounter==0) 
-            StartTime=clock();
+        if(FramerCounter == 0) {
+            StartTime = clock();
+        }
 
         FramerCounter++;
-        EndTime=clock();
-        if((EndTime-StartTime)/CLOCKS_PER_SEC>=1){
+        EndTime = clock();
+        if((EndTime - StartTime) / CLOCKS_PER_SEC >= 1){
             //cout << "\rFPS: " << FramerCounter << flush;
         }
     }
@@ -113,46 +120,36 @@ void video_cap_thread(void) {
     cam.release();
 }
 
-struct __attribute__ ((packed)) uart_packet {
-    int16_t pos[2];
-    float vel;
-};
-
-/* Uart thread */
-void uart_thread(void) {
-    if(uart_init() != EXIT_SUCCESS) {
-	cerr << "Failed to initialize uart\n";
-	return;
+/* UDP thread */
+void udp_thread(void) {
+    if(udp_init(sizeof(struct packet), sizeof(struct packet)) != EXIT_SUCCESS) {
+        cerr << "Failed to initialize uart\n";
+        return;
     }
 
-    struct uart_packet pack;
-    pack.pos[0] = 0;
-    pack.pos[1] = 0;
-    pack.vel = 0;
+    struct packet pack;
+    memset(&pack, 0, sizeof(pack));
 
-    while(!uart_quit) {
-        uart_mtx.lock();
-        memcpy(pack.pos, uart_pos, 2*sizeof(*uart_pos));
-        pack.vel = uart_vel;
-        uart_mtx.unlock();
+    while(!udp_quit) {
+        udp_mtx.lock();
+        memcpy(&pack, &vis, sizeof(pack));
+        udp_mtx.unlock();
 
-        uart_write(&pack, sizeof(pack));
-        usleep(1000);
+        udp_send(&pack);
+        Sleep(1);
     }
 
     memset(&pack, 0, sizeof(pack));
-    uart_write(&pack, sizeof(pack));
-
-    uart_release();
+    udp_send(&pack, sizeof(pack));
 }
 
 void handle_sigint(int signum) {
     if(signum == SIGINT) {
         cap_quit = true;
-        uart_quit = true;
-        
-        uart_send.join();
-        video_capture.join();
+        udp_quit = true;
+
+        udp_thread_handle.join();
+        video_cap_thread_handle.join();
 
         queue<Mat>().swap(frame_queue);
         queue<clock_t>().swap(cap_time_queue);
@@ -161,12 +158,8 @@ void handle_sigint(int signum) {
     }
 }
 
-int main(int argc, char* argv[]) {
-    (void)argc;
-    (void)argv;
-
+int main(void) {
     signal(SIGINT, handle_sigint);
-
     int canny_param = CANNY_DEFAULT;
 
 #ifdef GUI_DEMO
@@ -190,8 +183,8 @@ int main(int argc, char* argv[]) {
     createTrackbar("Canny Thres", "Thresh Params", &canny_param, 255, NULL, NULL);
 #endif
 
-    video_capture = thread(video_cap_thread);
-    uart_send = thread(uart_thread);
+    video_cap_thread_handle = thread(video_cap_thread);
+    udp_thread_handle = thread(udp_thread);
 
     Mat hsv;
     Mat thres;
@@ -208,39 +201,39 @@ int main(int argc, char* argv[]) {
 
     size_t largest_contour;
     while(true) {
-	if(frame_queue.empty()) {
-	    continue;
-	}
+        if(frame_queue.empty()) {
+            continue;
+        }
 
-	cvtColor(frame_queue.front(), hsv, CV_BGR2HSV);
+        cvtColor(frame_queue.front(), hsv, CV_BGR2HSV);
 
 #ifdef GUI_DEMO
-	hsv_hue_lim = Scalar(hsv_hue_lo, hsv_hue_hi);
-	hsv_sat_lim = Scalar(hsv_sat_lo, hsv_sat_hi);
-	hsv_val_lim = Scalar(hsv_val_lo, hsv_val_hi);
+        hsv_hue_lim = Scalar(hsv_hue_lo, hsv_hue_hi);
+        hsv_sat_lim = Scalar(hsv_sat_lo, hsv_sat_hi);
+        hsv_val_lim = Scalar(hsv_val_lo, hsv_val_hi);
 #endif
 
-	hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
-	detect_circles(thres, circles, canny_param);
+        hsv_threshold(hsv, thres, hsv_hue_lim, hsv_sat_lim, hsv_val_lim);
+        detect_circles(thres, circles, canny_param);
 
-	if(circles.size()) {
-	    centroids = vector<Point>(circles.size());
-	    calc_centroids(centroids, circles);
+        if(circles.size()) {
+            centroids = vector<Point>(circles.size());
+            calc_centroids(centroids, circles);
 
-	    largest_contour = 0;
-	    for(size_t i = 0; i < circles.size(); i++) {
-		if(arcLength(circles[largest_contour], true) < arcLength(circles[i], true)) { 
+            largest_contour = 0;
+            for(size_t i = 0; i < circles.size(); i++) {
+                if(arcLength(circles[largest_contour], true) < arcLength(circles[i], true)) { 
                     largest_contour = i;
-		}
-	    }
+                }
+            }
 
             vel_x = reg_param(N_centroids, N_time);
             update_N_params(centroids[largest_contour], cap_time_queue.front(), N_centroids, N_time);
 
 #ifdef GUI_DEMO
-	    drawContours(frame_queue.front(), circles, largest_contour, CIRCLE_COLOR_RGB, 
+            drawContours(frame_queue.front(), circles, largest_contour, CIRCLE_COLOR_RGB, 
                     CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, noArray(), 0, Point());
-	    circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, 
+            circle(frame_queue.front(), centroids[largest_contour], 1, CIRCLE_COLOR_RGB, 
                     CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
 #endif
         }
@@ -253,32 +246,35 @@ int main(int argc, char* argv[]) {
         cout << "Pos: " << N_centroids[N_FRAME_COUNT - 1] << endl;
         cout << "Vel: " << vel_x << endl << endl << endl;
 
-        uart_mtx.lock();
-        uart_pos[0] = N_centroids[N_FRAME_COUNT - 1].x;
-        uart_pos[1] = N_centroids[N_FRAME_COUNT - 1].y;
-        uart_vel = vel_x;
-        uart_mtx.unlock();
+        udp_mtx.lock();
+        vis.x = N_centroids[N_FRAME_COUNT - 1].x;
+        vis.y = N_centroids[N_FRAME_COUNT - 1].y;
+        vis.vel = vel_x;
+        udp_mtx.unlock();
 
 #ifdef GUI_DEMO
+        /* Draw image origin */
         circle(frame_queue.front(), Point(0, 0), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
+
+        /* Draw problem domain origin */
         circle(frame_queue.front(), Point(640 / 2 , 480), 1, CIRCLE_COLOR_RGB, CIRCLE_THICKNESS, CIRCLE_LINE_TYPE, 0);
-	imshow("Tracking", frame_queue.front());
-	imshow("Thresholding", thres);
-	if(waitKey(1) > 0) {
-	        break;
-	}
+        imshow("Tracking", frame_queue.front());
+        imshow("Thresholding", thres);
+        if(waitKey(1) > 0) {
+            break;
+        }
 #endif
 
-	frame_queue.pop();
-	cap_time_queue.pop();
+        frame_queue.pop();
+        cap_time_queue.pop();
     }
 
 #ifdef GUI_DEMO
     cap_quit = true;
-    uart_quit = true;
-    
-    uart_send.join();
-    video_capture.join();
+    udp_quit = true;
+
+    udp_thread_handle.join();
+    video_cap_thread_handle.join();
 
     queue<Mat>().swap(frame_queue);
     queue<clock_t>().swap(cap_time_queue);

@@ -21,9 +21,13 @@ void Track::hsv_threshold(Mat hsv, Mat &thres, Scalar hue_lim, Scalar sat_lim, S
 void Track::detect_circles(Mat &thres, vector<vector<Point>> &circles, int canny_param) {
     Mat buf;
 
+    /* Erode/dilate cycle eliminates noisy regions,
+     * leaving only the large region of the ball */
     erode(thres, buf, Mat(), Point(-1, -1), EROSIONS);
     dilate(buf, thres, Mat(), Point(-1, -1), DILATIONS);
 
+    /* Canny edge detector on the single-region threshold image --
+     * second threshold is double canny_param per openCV recommendation */
     Canny(thres, buf, canny_param, canny_param * 2, 3);
     findContours(buf, circles, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
 }
