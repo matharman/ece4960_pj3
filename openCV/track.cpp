@@ -1,4 +1,5 @@
-#include "include/track.h"
+#include "stdafx.h"
+#include "track.h"
 
 #define EROSIONS 3
 #define DILATIONS 5
@@ -22,7 +23,7 @@ void Track::detect_circles(Mat &thres, vector<vector<Point>> &circles, int canny
     Mat buf;
 
     /* Erode/dilate cycle eliminates noisy regions,
-     * leaving only the large region of the ball */
+     * leaving only the region of the ball */
     erode(thres, buf, Mat(), Point(-1, -1), EROSIONS);
     dilate(buf, thres, Mat(), Point(-1, -1), DILATIONS);
 
@@ -41,6 +42,6 @@ void Track::calc_centroids(vector<Point> &centroids, vector<vector<Point>> circl
     }
 
     for(size_t i = 0; i < mu.size(); i++) {
-        centroids[i] = Point(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+        centroids[i] = Point((mu[i].m10 / mu[i].m00), (mu[i].m01 / mu[i].m00));
     }
 }
